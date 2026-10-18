@@ -1,0 +1,37 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "메인 창 최소 권한. 파일·셸·프로세스 플러그인 권한을 추가하지 않는다. 외부 URL은 Google 동의·캘린더 화면만 Chrome(없으면 기본 브라우저)으로 연다.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "https://accounts.google.com/*"
+        },
+        {
+          "url": "https://accounts.google.com/*",
+          "app": "chrome.exe"
+        },
+        {
+          "url": "https://calendar.google.com/*"
+        },
+        {
+          "url": "https://calendar.google.com/*",
+          "app": "chrome.exe"
+        },
+        {
+          "url": "https://www.google.com/calendar/*"
+        },
+        {
+          "url": "https://www.google.com/calendar/*",
+          "app": "chrome.exe"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  // 실행 및 디버그(launch.json)의 preLaunchTask에서 쓴다.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "dev:mobile (background)",
+      "detail": "휴대폰 화면 개발 서버 1430. 미리보기 전에 실행된다",
+      "type": "npm",
+      "script": "dev:mobile",
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "vite",
+        "pattern": { "regexp": "^__never_match__$" },
+        "background": {
+          "activesBegin": "VITE",
+          "beginsPattern": "VITE",
+          "endsPattern": "Local:"
+        }
+      }
+    }
+  ]
+}

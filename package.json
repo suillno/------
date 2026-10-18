@@ -1,0 +1,47 @@
+{
+  "name": "meeting-assistant",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/web",
+    "apps/desktop",
+    "apps/mobile",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev:web": "npm run dev -w @meeting/web",
+    "dev:desktop": "npm run tauri -w @meeting/desktop -- dev",
+    "dev:mobile": "npm run dev -w @meeting/mobile",
+    "build:web": "npm run build -w @meeting/web",
+    "build:desktop": "npm run tauri -w @meeting/desktop -- build",
+    "install:desktop": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/install-desktop.ps1",
+    "start:app": "node scripts/start-app.mjs",
+    "build:mobile-web": "npm run build -w @meeting/mobile",
+    "build:android": "node scripts/build-android.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:integration": "node scripts/run-integration.mjs",
+    "check": "npm run typecheck && npm test",
+    "verify": "npm run check && npm run test:rust",
+    "gen:contracts": "node --experimental-strip-types --no-warnings scripts/gen-contracts.ts",
+    "test:rust": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:test": "supabase test db",
+    "functions:serve": "supabase functions serve --env-file supabase/functions/.env"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "supabase": "^2.121.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.5"
+  }
+}

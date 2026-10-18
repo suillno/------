@@ -1,0 +1,17 @@
+[package]
+name = "meeting-assistant-mobile"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# 휴대폰(안드로이드) 앱. 분석 실행기·CLI·로컬 파일 기능은 넣지 않는다 (docs/plans/mobile-android.md).
+[lib]
+name = "meeting_assistant_mobile_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"

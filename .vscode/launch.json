@@ -1,0 +1,46 @@
+{
+  // 실행 및 디버그(Ctrl+Shift+D). 실제로 쓰는 항목만 둔다. 명령 원본은 package.json scripts.
+  // 서버는 클라우드(Supabase)에 있으므로 Docker·로컬 Supabase 항목은 두지 않는다.
+  // 로컬 Supabase가 필요하면 터미널에서 npm run db:start / functions:serve (AGENTS.md 명령 표).
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "1. 회의 어시스턴트 실행 (설치본)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run start:app"
+    },
+    {
+      "name": "2. PC 앱 설치본 업데이트 (빌드 + 설치 + 바로가기)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run install:desktop"
+    },
+    {
+      "name": "3. 휴대폰 화면 미리보기 (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://127.0.0.1:1430",
+      "webRoot": "${workspaceFolder}/apps/mobile",
+      "preLaunchTask": "dev:mobile (background)"
+    },
+    {
+      "name": "4. 안드로이드 APK 빌드 (개발자 모드 필요)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run build:android"
+    },
+    {
+      "name": "5. PC 앱 개발 모드 (화면 수정 바로 확인)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run dev:desktop"
+    },
+    {
+      "name": "검증: 전체 테스트 (타입 검사 + TS + Rust)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npm run verify"
+    }
+  ]
+}

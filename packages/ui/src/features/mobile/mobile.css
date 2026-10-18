@@ -1,0 +1,132 @@
+/* 휴대폰 화면. 손가락으로 누르기 쉬운 크기(최소 44px)와 안드로이드 화면 가장자리(safe area)를 고려한다. */
+.m-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.m-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.m-header h1 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.m-back {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.m-link {
+  border: 0;
+  background: none;
+  color: var(--muted);
+}
+
+.m-main {
+  flex: 1;
+  padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 84px);
+}
+
+.m-pad {
+  padding: 0 16px;
+}
+
+.m-tabs {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.m-tabs button {
+  min-height: 56px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.m-tabs button[aria-current="page"] {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.m-count {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--err);
+  color: #fff;
+  font-size: 0.75rem;
+  line-height: 18px;
+}
+
+.m-list {
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.m-list li + li {
+  margin-top: 8px;
+}
+
+.m-list button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  text-align: left;
+}
+
+.m-list-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.m-list-main .title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* 휴대폰 입력란은 16px 이상이어야 확대되지 않는다 */
+.m-shell input,
+.m-shell textarea,
+.m-shell button {
+  font-size: 1rem;
+}
+
+.m-shell .row > button,
+.m-shell .confirm button {
+  min-height: 44px;
+}

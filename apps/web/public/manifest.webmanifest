@@ -1,0 +1,7 @@
+{
+  "name": "회의 어시스턴트",
+  "short_name": "회의",
+  "start_url": "/",
+  "display": "standalone",
+  "lang": "ko"
+}

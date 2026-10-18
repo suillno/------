@@ -1,0 +1,37 @@
+# 의존성·빌드 산출물
+node_modules/
+dist/
+build/
+target/
+apps/desktop/src-tauri/gen/
+apps/mobile/src-tauri/gen/schemas/
+# 안드로이드 서명 키와 설정(저장소 밖 %LOCALAPPDATA%\MeetingAssistant\android-signing에 둔다)
+*.jks
+*.keystore
+keystore.properties
+*.tsbuildinfo
+
+# 환경변수·비밀 (예제만 허용)
+.env*
+!.env.example
+supabase/.temp/
+supabase/.branches/
+
+# 로컬 DB·로그·임시 분석 자료
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+*.db
+logs/
+*.log
+tmp/
+analysis-jobs/
+
+# 편집기·OS
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.idea/
+.DS_Store
+Thumbs.db

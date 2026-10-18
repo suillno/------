@@ -1,0 +1,17 @@
+{
+  "name": "@meeting/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@meeting/client-core": "^0.0.0",
+    "@meeting/ui": "^0.0.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  }
+}
