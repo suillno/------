@@ -115,3 +115,26 @@ export interface SharedText {
 }
 
 export const SHARE_EVENT = "meeting-assistant:share";
+
+const MAX_TITLE = 300;
+/** Joplin은 노트를 '<32자리 노트 ID>.md' 파일로 공유해 파일 이름이 ID가 된다. 이런 값은 제목으로 쓰지 않는다. */
+const NOTE_ID_TITLE = /^[0-9a-f]{32}$/i;
+
+/**
+ * 공유받은 내용을 새 회의 작성 초안(제목·본문)으로 바꾼다.
+ * 제목이 없거나 노트 ID 형식이면 본문의 첫 줄(Markdown 제목 기호 '#' 제거)을 제목으로 쓰고 본문에서 뺀다.
+ */
+export function draftFromShare(shared: SharedText): { title: string; body: string } {
+  const given = shared.title?.trim() ?? "";
+  const body = shared.text ?? "";
+  if (given && !NOTE_ID_TITLE.test(given)) return { title: given.slice(0, MAX_TITLE), body };
+
+  const lines = body.split(/\r?\n/);
+  const first = lines.findIndex((l) => l.trim() !== "");
+  if (first < 0) return { title: "", body };
+  const title = lines[first]!.trim().replace(/^#{1,6}\s+/, "").trim();
+  if (!title) return { title: "", body };
+  const rest = lines.slice(first + 1);
+  while (rest.length && rest[0]!.trim() === "") rest.shift();
+  return { title: title.slice(0, MAX_TITLE), body: rest.join("\n") };
+}

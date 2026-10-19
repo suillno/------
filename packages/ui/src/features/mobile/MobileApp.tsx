@@ -18,7 +18,7 @@ import type { MeetingAnalysisState, MeetingRow } from "@meeting/contracts";
 import { Badge, ConfirmBox, ErrorText, errorMessage } from "../../common";
 import { AppContext, useApp, useGoogleConnection, useMeetingAnalysis, useSession, type AppContextValue } from "../../context";
 import { MarkdownBody } from "../../markdown";
-import { SHARE_EVENT, type DeviceSettings, type Platform } from "../../platform";
+import { SHARE_EVENT, draftFromShare, type DeviceSettings, type Platform } from "../../platform";
 import { LoginForm } from "../auth/LoginForm";
 import { CandidateList } from "../calendar/CandidateList";
 import { MissingMeeting, NewMeetingForm, type MeetingDraft } from "../meetings";
@@ -63,7 +63,7 @@ async function collectShare(platform: Platform): Promise<{ added: boolean; notic
   if (!shared) return { added: false, notice: null };
   if (!shared.text && shared.unsupported) return { added: false, notice: shared.unsupported };
   if (!shared.text && !shared.title) return { added: false, notice: null };
-  writeDraft(platform.deviceSettings, { title: shared.title ?? "", body: shared.text ?? "", source: "공유" });
+  writeDraft(platform.deviceSettings, { ...draftFromShare(shared), source: "공유" });
   return { added: true, notice: shared.unsupported ?? null };
 }
 
