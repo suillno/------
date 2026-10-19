@@ -5,20 +5,24 @@ import { SingleFlight, formatInZone, isValidTimeZone, localToInstant } from "@me
 import type { MeetingRow } from "@meeting/contracts";
 import { ErrorText, errorMessage } from "../../common";
 import { useApp, useMeetingAnalysis } from "../../context";
+import { MarkdownBody, MarkdownEditor } from "../../markdown";
 import { CandidateList } from "../calendar/CandidateList";
 import { AnalysisPanel } from "./AnalysisPanel";
+import { DeleteMeetingButton } from "./DeleteMeeting";
 
 export const meetingsFeature = {
   id: "meetings",
   title: "회의록",
 } as const;
 
-export function MeetingsPage() {
+/** focusMeetingId: 캘린더 '원본 회의록 보기' 링크(딥링크)로 받은 회의. 목록에 없으면 안내한다 */
+export function MeetingsPage({ focusMeetingId, onFocusHandled }: { focusMeetingId?: string | null; onFocusHandled?: () => void } = {}) {
   const { api } = useApp();
   const [meetings, setMeetings] = useState<MeetingRow[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [missing, setMissing] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -32,6 +36,16 @@ export function MeetingsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // 딥링크로 받은 회의: 목록을 읽은 뒤 열고, 없으면(삭제·권한 없음) 안내 화면을 보인다
+  useEffect(() => {
+    if (!focusMeetingId || !meetings) return;
+    const found = meetings.some((m) => m.id === focusMeetingId);
+    setCreating(false);
+    setSelected(found ? focusMeetingId : null);
+    setMissing(!found);
+    onFocusHandled?.();
+  }, [focusMeetingId, meetings, onFocusHandled]);
 
   const current = meetings?.find((m) => m.id === selected) ?? null;
 
@@ -50,12 +64,13 @@ export function MeetingsPage() {
         <ul className="meeting-list" aria-label="회의록 목록">
           {meetings?.length === 0 && <li className="muted">회의록이 없습니다.</li>}
           {meetings?.map((m) => (
-            <li key={m.id}>
+            <li key={m.id} className="meeting-item">
               <button type="button" aria-current={m.id === selected ? "true" : undefined}
-                onClick={() => { setSelected(m.id); setCreating(false); }}>
+                onClick={() => { setSelected(m.id); setCreating(false); setMissing(false); }}>
                 <span className="title">{m.title}</span>
                 <span className="muted">{formatInZone(m.meeting_at, m.time_zone)}</span>
               </button>
+              <DeleteMeetingButton compact meeting={m} onDeleted={async () => { if (selected === m.id) setSelected(null); await load(); }} />
             </li>
           ))}
         </ul>
@@ -71,8 +86,11 @@ export function MeetingsPage() {
               }}
             />
           )}
-          {current && <MeetingDetail key={current.id} meeting={current} />}
-          {!creating && !current && <p className="muted">회의록을 고르거나 새로 작성하세요.</p>}
+          {missing && !creating && !current && <MissingMeeting />}
+          {current && (
+            <MeetingDetail key={current.id} meeting={current} onDeleted={async () => { setSelected(null); await load(); }} />
+          )}
+          {!creating && !current && !missing && <p className="muted">회의록을 고르거나 새로 작성하세요.</p>}
         </div>
       </div>
     </section>
@@ -93,13 +111,41 @@ function nowLocal(): string {
   return d.toISOString().slice(0, 16);
 }
 
-export function NewMeetingForm({ onCancel, onCreated }: { onCancel: () => void; onCreated: (m: MeetingRow) => Promise<void> }) {
+/** 회의 링크가 가리키는 회의가 없을 때(삭제됐거나 다른 계정의 회의) */
+export function MissingMeeting() {
+  return (
+    <div className="panel">
+      <h3>회의록을 열 수 없습니다</h3>
+      <p>삭제됐거나 지금 로그인한 계정으로는 볼 수 없는 회의록입니다.</p>
+    </div>
+  );
+}
+
+export interface MeetingDraft {
+  title?: string;
+  body?: string;
+  /** 어디서 가져왔는지 안내(예: Joplin 공유) */
+  source?: string;
+}
+
+/**
+ * initial: 공유 등으로 미리 채울 값. onDraftChange: 입력이 바뀔 때마다 기기에 초안을 보관(앱 종료·로그인 전에도 유지).
+ * 저장은 사용자가 '저장'을 눌렀을 때만 한다(자동 저장·자동 분석 없음).
+ */
+export function NewMeetingForm({ onCancel, onCreated, initial, onDraftChange }: {
+  onCancel: () => void;
+  onCreated: (m: MeetingRow) => Promise<void>;
+  initial?: MeetingDraft | null;
+  onDraftChange?: (draft: MeetingDraft) => void;
+}) {
   const { api } = useApp();
   const flight = useRef(new SingleFlight()).current;
-  const [title, setTitle] = useState("");
+  const [title, setTitleState] = useState(initial?.title ?? "");
   const [at, setAt] = useState(nowLocal);
   const [tz, setTz] = useState(defaultTimeZone);
-  const [body, setBody] = useState("");
+  const [body, setBodyState] = useState(initial?.body ?? "");
+  const setTitle = (v: string) => { setTitleState(v); onDraftChange?.({ ...initial, title: v, body }); };
+  const setBody = (v: string) => { setBodyState(v); onDraftChange?.({ ...initial, title, body: v }); };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -122,6 +168,7 @@ export function NewMeetingForm({ onCancel, onCreated }: { onCancel: () => void; 
   return (
     <form className="panel" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
       <h3>새 회의록</h3>
+      {initial?.source && <p className="muted">{initial.source}에서 가져온 내용입니다. 확인·수정한 뒤 저장하세요.</p>}
       <fieldset disabled={busy}>
         <label>
           제목
@@ -137,10 +184,7 @@ export function NewMeetingForm({ onCancel, onCreated }: { onCancel: () => void; 
             <input value={tz} onChange={(e) => setTz(e.target.value)} />
           </label>
         </div>
-        <label>
-          본문
-          <textarea rows={10} value={body} onChange={(e) => setBody(e.target.value)} />
-        </label>
+        <MarkdownEditor label="본문 (Markdown 지원)" value={body} onChange={setBody} rows={12} />
         <p className="muted">저장해도 분석은 시작되지 않습니다. 저장 후 ‘분석 실행’을 눌러야 분석합니다.</p>
         <div className="row">
           <button type="submit" className="primary" disabled={!title.trim()}>{busy ? "저장 중…" : "저장"}</button>
@@ -152,15 +196,18 @@ export function NewMeetingForm({ onCancel, onCreated }: { onCancel: () => void; 
   );
 }
 
-function MeetingDetail({ meeting }: { meeting: MeetingRow }) {
+function MeetingDetail({ meeting, onDeleted }: { meeting: MeetingRow; onDeleted: () => Promise<void> }) {
   const { api } = useApp();
   const { state, error, refresh } = useMeetingAnalysis(api, meeting.id);
   return (
     <div>
       <article className="panel">
-        <h3>{meeting.title}</h3>
+        <div className="row between">
+          <h3>{meeting.title}</h3>
+          <DeleteMeetingButton meeting={meeting} onDeleted={onDeleted} />
+        </div>
         <p className="muted">{formatInZone(meeting.meeting_at, meeting.time_zone)} ({meeting.time_zone})</p>
-        <p className="body-text">{meeting.body || "(본문 없음)"}</p>
+        <MarkdownBody source={meeting.body} />
       </article>
       <ErrorText>{error}</ErrorText>
       {state && state.meeting.revision_id !== meeting.revision_id && (

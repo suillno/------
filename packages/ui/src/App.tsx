@@ -86,6 +86,25 @@ function MainShell({ api, platform, session }: { api: MeetingApi; platform: Plat
   const [google, setGoogle] = useState<GoogleConnectionStatus | null>(null);
   const [pcAnalysisEnabled, setPcAnalysisEnabled] = useState(() => platform.deviceSettings.get(SETTING_PC_ANALYSIS) === "1");
   const loopRef = useRef<AnalysisAgentLoop | null>(null);
+  // 캘린더 ‘원본 회의록 보기’ 링크·요약 목록에서 연 회의
+  const [focusMeetingId, setFocusMeetingId] = useState<string | null>(null);
+  const openMeeting = useCallback((id: string) => {
+    setFocusMeetingId(id);
+    setActive("meetings");
+  }, []);
+  const clearFocus = useCallback(() => setFocusMeetingId(null), []);
+
+  // 로그인 전에 받은 링크는 기기에 보관돼 있다가 여기서 열린다
+  useEffect(() => {
+    const inbox = platform.meetingLinks;
+    if (!inbox) return;
+    const pending = inbox.take();
+    if (pending) openMeeting(pending);
+    return inbox.subscribe(() => {
+      const id = inbox.take();
+      if (id) openMeeting(id);
+    });
+  }, [platform, openMeeting]);
 
   const refreshGoogle = useCallback(async () => {
     try {
@@ -153,8 +172,8 @@ function MainShell({ api, platform, session }: { api: MeetingApi; platform: Plat
         <button type="button" onClick={() => void api.signOut()}>로그아웃</button>
       </nav>
       <main className="shell-main">
-        {active === "meetings" && <MeetingsPage />}
-        {active === "notes" && <NotesPage />}
+        {active === "meetings" && <MeetingsPage focusMeetingId={focusMeetingId} onFocusHandled={clearFocus} />}
+        {active === "notes" && <NotesPage onOpenMeeting={openMeeting} />}
         {active === "tasks" && <TasksPage />}
         {active === "calendar" && <CalendarPage />}
         {active === "settings" && <SettingsPage oauthResult={oauthResult} />}

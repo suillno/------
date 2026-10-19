@@ -13,6 +13,7 @@ import type {
   MeetingAnalysisState,
   MeetingNotes,
   MeetingRow,
+  MeetingSummaryItem,
 } from "@meeting/contracts";
 import { toApiError } from "./rpcError";
 
@@ -92,6 +93,10 @@ export interface MeetingApi {
 
   listMeetings(): Promise<MeetingRow[]>;
   createMeeting(operationId: string, input: NewMeeting): Promise<MeetingRow>;
+  /** 회의록 영구 삭제(분석·후보 포함). Google에 등록된 일정은 남는다 */
+  purgeMeeting(operationId: string, meetingId: string, baseVersion: number): Promise<{ id: string; purged: true; registered_events_kept: number }>;
+  /** ‘요약·결정사항’ 탭: 회의별 최신 분석 결과 목록 */
+  listSummaries(): Promise<MeetingSummaryItem[]>;
 
   getAnalysisState(meetingId: string): Promise<MeetingAnalysisState>;
   /** 검토 필요·등록 대기·등록 실패 후보 목록. 원문 변경(stale) 여부는 회의 화면에서 다시 계산한다 */
@@ -99,7 +104,7 @@ export interface MeetingApi {
   /** 회의별 최신 분석 작업 (requested_at 최신순, 회의당 1건) */
   listLatestJobs(): Promise<JobSummary[]>;
   /** '분석 실행'(initial)·'재분석'(rerun) 버튼 */
-  requestAnalysis(operationId: string, meetingId: string, sourceRevisionId: string, mode: "initial" | "rerun"): Promise<AnalysisJob>;
+  requestAnalysis(operationId: string, meetingId: string, sourceRevisionId: string, mode: "initial" | "rerun", userInstructions?: string | null): Promise<AnalysisJob>;
   /** 분석 '재시도' 버튼 */
   retryAnalysis(operationId: string, jobId: string): Promise<AnalysisJob>;
   patchNotes(operationId: string, meetingId: string, baseVersion: number, patch: { summary?: string; decisions?: string[] }): Promise<MeetingNotes>;
@@ -207,6 +212,12 @@ export function createSupabaseMeetingApi(opts: SupabaseApiOptions): MeetingApi {
       }
       return data as MeetingRow[];
     },
+    purgeMeeting(operationId, meetingId, baseVersion) {
+      return call("meeting_purge", { p_operation_id: operationId, p_id: meetingId, p_base_version: baseVersion });
+    },
+    listSummaries() {
+      return call("meeting_summaries", {});
+    },
     createMeeting(operationId, input) {
       return call("meeting_create", {
         p_operation_id: operationId, p_id: crypto.randomUUID(), p_title: input.title, p_body: input.body,
@@ -249,8 +260,11 @@ export function createSupabaseMeetingApi(opts: SupabaseApiOptions): MeetingApi {
           all_day: r.payload.all_day === true,
         }));
     },
-    requestAnalysis(operationId, meetingId, sourceRevisionId, mode) {
-      return call("analysis_request", { p_operation_id: operationId, p_meeting_id: meetingId, p_source_revision_id: sourceRevisionId, p_mode: mode });
+    requestAnalysis(operationId, meetingId, sourceRevisionId, mode, userInstructions) {
+      return call("analysis_request", {
+        p_operation_id: operationId, p_meeting_id: meetingId, p_source_revision_id: sourceRevisionId, p_mode: mode,
+        p_user_instructions: userInstructions && userInstructions.trim() ? userInstructions.trim() : null,
+      });
     },
     retryAnalysis(operationId, jobId) {
       return call("analysis_retry", { p_operation_id: operationId, p_job_id: jobId });

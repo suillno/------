@@ -169,3 +169,31 @@ fieldset { margin: 0; padding: 0; border: 0; }
 .candidate { margin: 8px 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
 .candidate .evidence { font-size: 0.8125rem; color: var(--muted); white-space: pre-wrap; }
 .candidate-form .row label { flex: 1; min-width: 160px; }
+
+/* 2026-10-19: 영구 삭제, Markdown 편집/미리보기, 요약 목록 */
+button.danger { border-color: var(--err); color: var(--err); }
+button.danger-link { border: 0; background: none; color: var(--err); padding: 4px 6px; font-size: 0.875rem; }
+.meeting-item { display: flex; align-items: center; gap: 4px; }
+.meeting-item > button:first-child { flex: 1; min-width: 0; }
+
+.md-editor { margin: 8px 0; }
+.md-label { font-size: 0.875rem; }
+.md-tabs { display: inline-flex; gap: 0; }
+.md-tabs button { border-radius: 0; padding: 4px 10px; font-size: 0.8125rem; }
+.md-tabs button:first-child { border-radius: 6px 0 0 6px; }
+.md-tabs button:last-child { border-radius: 0 6px 6px 0; }
+.md-tabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.md-preview { min-height: 8rem; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; }
+.markdown { overflow-wrap: anywhere; line-height: 1.55; }
+.markdown h1, .markdown h2, .markdown h3 { font-size: 1.05rem; margin: 10px 0 6px; }
+.markdown pre, .markdown code { font-family: ui-monospace, Consolas, monospace; font-size: 0.875rem; }
+.markdown pre { overflow-x: auto; padding: 8px; border: 1px solid var(--line); border-radius: 6px; }
+.markdown table { border-collapse: collapse; display: block; overflow-x: auto; }
+.markdown th, .markdown td { border: 1px solid var(--line); padding: 4px 8px; }
+.markdown blockquote { margin: 6px 0; padding-left: 10px; border-left: 3px solid var(--line); color: var(--muted); }
+
+.summary-list { list-style: none; margin: 12px 0; padding: 0; }
+.summary-list li + li { margin-top: 8px; }
+.summary-list button { display: flex; flex-direction: column; align-items: stretch; gap: 4px; width: 100%; text-align: left; padding: 10px 12px; }
+.summary-list .title { font-weight: 600; overflow-wrap: anywhere; }
+.summary-preview { color: var(--fg); font-size: 0.875rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }

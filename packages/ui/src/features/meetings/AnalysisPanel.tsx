@@ -6,6 +6,7 @@ import { SingleFlight, analysisView } from "@meeting/client-core";
 import type { MeetingAnalysisState } from "@meeting/contracts";
 import { Badge, ConfirmBox, ErrorText, errorMessage, needsRefresh } from "../../common";
 import { useApp } from "../../context";
+import { InstructionsField, initialInstructions, instructionsIgnored } from "./Instructions";
 
 type Pending = "run" | "rerun" | "retry" | null;
 
@@ -13,20 +14,30 @@ export function AnalysisPanel({ state, refresh }: { state: MeetingAnalysisState;
   const { api, runOnThisDevice, pcAnalysisEnabled, platform } = useApp();
   const flight = useRef(new SingleFlight()).current;
   const [pending, setPending] = useState<Pending>(null);
-  const [confirming, setConfirming] = useState<"run" | "rerun" | null>(null);
+  const [confirming, setConfirmingState] = useState<"run" | "rerun" | null>(null);
+  const [instructions, setInstructions] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const setConfirming = (kind: "run" | "rerun" | null) => {
+    if (kind) setInstructions(initialInstructions(state, kind));
+    setConfirmingState(kind);
+  };
   const view = analysisView(state, pending !== null);
   const key = `analysis:${state.meeting.id}`;
 
   async function execute(kind: "run" | "rerun" | "retry") {
     setError(null);
+    setNotice(null);
     setPending(kind);
     try {
       const job = await flight.run(key, (op) =>
         kind === "retry" && state.job
           ? api.retryAnalysis(op, state.job.id)
-          : api.requestAnalysis(op, state.meeting.id, state.meeting.revision_id, kind === "rerun" ? "rerun" : "initial"),
+          : api.requestAnalysis(op, state.meeting.id, state.meeting.revision_id, kind === "rerun" ? "rerun" : "initial", instructions),
       );
+      if (kind !== "retry" && instructionsIgnored(job, instructions)) {
+        setNotice("이미 요청된 분석이 있어 새 요청사항은 적용되지 않았습니다. 분석이 끝난 뒤 재분석에서 다시 입력하세요.");
+      }
       setConfirming(null);
       if (job.status === "queued") runOnThisDevice?.(job.id);
     } catch (e) {
@@ -66,6 +77,7 @@ export function AnalysisPanel({ state, refresh }: { state: MeetingAnalysisState;
         >
           <p>현재 회의록 원문(제목·본문·회의 날짜)을 PC의 Claude Code로 보내 분석합니다. 원문은 Anthropic 서비스로 전송됩니다.</p>
           {confirming === "rerun" && <p>재분석 결과는 새 결과로만 저장되며, 지금의 요약·결정사항 편집본과 할 일 상태는 바뀌지 않습니다.</p>}
+          <InstructionsField value={instructions} onChange={setInstructions} disabled={pending !== null} />
         </ConfirmBox>
       ) : (
         <div className="row">
@@ -83,6 +95,10 @@ export function AnalysisPanel({ state, refresh }: { state: MeetingAnalysisState;
           ))}
         </div>
       )}
+      {state.job?.user_instructions && !confirming && (
+        <p className="muted">요청사항: {state.job.user_instructions}</p>
+      )}
+      {notice && <p className="muted" role="status">{notice}</p>}
       <ErrorText>{error}</ErrorText>
 
       <NotesEditor state={state} refresh={refresh} />

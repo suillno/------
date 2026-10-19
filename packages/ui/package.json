@@ -9,6 +9,8 @@
     "@meeting/client-core": "^0.0.0",
     "@meeting/contracts": "^0.0.0",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "react-markdown": "10.1.0",
+    "remark-gfm": "4.0.1"
   }
 }

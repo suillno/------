@@ -130,3 +130,19 @@
 .m-shell .confirm button {
   min-height: 44px;
 }
+
+/* 2026-10-19: 하단 탭 4개, 목록 항목 옆 삭제 버튼 */
+.m-tabs {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.m-meeting-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.m-meeting-item > button:first-child {
+  flex: 1;
+  min-width: 0;
+}

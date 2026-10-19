@@ -17,14 +17,55 @@ import {
 import type { MeetingAnalysisState, MeetingRow } from "@meeting/contracts";
 import { Badge, ConfirmBox, ErrorText, errorMessage } from "../../common";
 import { AppContext, useApp, useGoogleConnection, useMeetingAnalysis, useSession, type AppContextValue } from "../../context";
-import type { Platform } from "../../platform";
+import { MarkdownBody } from "../../markdown";
+import { SHARE_EVENT, type DeviceSettings, type Platform } from "../../platform";
 import { LoginForm } from "../auth/LoginForm";
 import { CandidateList } from "../calendar/CandidateList";
-import { NewMeetingForm } from "../meetings";
+import { MissingMeeting, NewMeetingForm, type MeetingDraft } from "../meetings";
+import { DeleteMeetingButton } from "../meetings/DeleteMeeting";
+import { InstructionsField, initialInstructions, instructionsIgnored } from "../meetings/Instructions";
+import { SummariesView } from "../notes";
 import "../../styles.css";
 import "./mobile.css";
 
-type Screen = { name: "list" } | { name: "new" } | { name: "meeting"; id: string } | { name: "schedule" };
+type Screen =
+  | { name: "list" }
+  | { name: "new" }
+  | { name: "meeting"; id: string }
+  | { name: "schedule" }
+  | { name: "summaries" };
+
+// ───────── 공유받은 텍스트 → 작성 중 초안 (docs/plans/2026-10-19-meeting-features.md 5장) ─────────
+// 앱 종료·로그인 전에 공유받아도 이 기기에 보관해 두었다가 로그인 후 새 회의 작성 화면에 채운다.
+// 저장하거나 취소하면 지운다. 자동 저장·자동 분석은 하지 않는다.
+
+const SETTING_SHARE_DRAFT = "meeting-assistant.share-draft";
+
+function readDraft(settings: DeviceSettings): MeetingDraft | null {
+  try {
+    const raw = settings.get(SETTING_SHARE_DRAFT);
+    if (!raw) return null;
+    const d = JSON.parse(raw) as MeetingDraft;
+    return typeof d === "object" && d ? d : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDraft(settings: DeviceSettings, draft: MeetingDraft | null) {
+  settings.set(SETTING_SHARE_DRAFT, draft ? JSON.stringify(draft) : "");
+}
+
+/** 공유 수신함에서 꺼내 초안으로 옮긴다. 새 공유가 있으면 true */
+async function collectShare(platform: Platform): Promise<{ added: boolean; notice: string | null }> {
+  if (!platform.takeSharedText) return { added: false, notice: null };
+  const shared = await platform.takeSharedText().catch(() => null);
+  if (!shared) return { added: false, notice: null };
+  if (!shared.text && shared.unsupported) return { added: false, notice: shared.unsupported };
+  if (!shared.text && !shared.title) return { added: false, notice: null };
+  writeDraft(platform.deviceSettings, { title: shared.title ?? "", body: shared.text ?? "", source: "공유" });
+  return { added: true, notice: shared.unsupported ?? null };
+}
 
 export function MobileApp({ platform }: { platform: Platform }) {
   if (!platform.api) {
@@ -39,12 +80,25 @@ export function MobileApp({ platform }: { platform: Platform }) {
 
 function MobileSession({ api, platform }: { api: MeetingApi; platform: Platform }) {
   const session = useSession(api);
+  const [hasDraft, setHasDraft] = useState(() => readDraft(platform.deviceSettings) !== null);
+
+  // 로그인 전에도 공유를 받아 초안으로 보관한다
+  useEffect(() => {
+    const take = () => void collectShare(platform).then((r) => r.added && setHasDraft(true));
+    take();
+    window.addEventListener(SHARE_EVENT, take);
+    return () => window.removeEventListener(SHARE_EVENT, take);
+  }, [platform]);
+
   if (session === undefined) return <div className="m-shell"><p className="muted m-pad">로그인 상태 확인 중…</p></div>;
   if (session === null) {
     return (
       <div className="m-shell">
         <header className="m-header"><h1>회의 어시스턴트</h1></header>
-        <main className="m-main"><LoginForm api={api} /></main>
+        <main className="m-main">
+          {hasDraft && <p className="muted">공유받은 메모가 보관되어 있습니다. 로그인하면 새 회의 작성 화면에 채워집니다.</p>}
+          <LoginForm api={api} />
+        </main>
       </div>
     );
   }
@@ -53,11 +107,44 @@ function MobileSession({ api, platform }: { api: MeetingApi; platform: Platform 
 
 function MobileShell({ api, platform, session }: { api: MeetingApi; platform: Platform; session: Session }) {
   const { google, refreshGoogle } = useGoogleConnection(api);
-  const [screen, setScreen] = useState<Screen>({ name: "list" });
+  const [draft, setDraft] = useState<MeetingDraft | null>(() => readDraft(platform.deviceSettings));
+  const [screen, setScreen] = useState<Screen>(() => (draft ? { name: "new" } : { name: "list" }));
   const [meetings, setMeetings] = useState<MeetingRow[] | null>(null);
   const [jobs, setJobs] = useState<Map<string, JobSummary>>(new Map());
   const [pending, setPending] = useState<PendingCandidate[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  // 새 공유가 들어오면 작성 화면을 새 내용으로 다시 그린다
+  const [draftKey, setDraftKey] = useState(0);
+
+  useEffect(() => {
+    const take = () => void collectShare(platform).then((r) => {
+      if (r.notice) setNotice(r.notice);
+      if (!r.added) return;
+      setDraft(readDraft(platform.deviceSettings));
+      setDraftKey((k) => k + 1);
+      setScreen({ name: "new" });
+    });
+    window.addEventListener(SHARE_EVENT, take);
+    return () => window.removeEventListener(SHARE_EVENT, take);
+  }, [platform]);
+
+  // 캘린더 ‘원본 회의록 보기’ 링크: 로그인 전에 받은 것도 여기서 연다
+  useEffect(() => {
+    const inbox = platform.meetingLinks;
+    if (!inbox) return;
+    const pendingLink = inbox.take();
+    if (pendingLink) setScreen({ name: "meeting", id: pendingLink });
+    return inbox.subscribe(() => {
+      const id = inbox.take();
+      if (id) setScreen({ name: "meeting", id });
+    });
+  }, [platform]);
+
+  const clearDraft = () => {
+    writeDraft(platform.deviceSettings, null);
+    setDraft(null);
+  };
 
   const reload = useCallback(async () => {
     try {
@@ -99,7 +186,8 @@ function MobileShell({ api, platform, session }: { api: MeetingApi; platform: Pl
             <button type="button" className="m-back" onClick={back} aria-label="뒤로">‹</button>
           ) : null}
           <h1>
-            {screen.name === "list" ? "등록 내역" : screen.name === "new" ? "회의 등록" : screen.name === "schedule" ? "일정 확인" : "회의 내역"}
+            {screen.name === "list" ? "등록 내역" : screen.name === "new" ? "회의 등록" : screen.name === "schedule" ? "일정 확인"
+              : screen.name === "summaries" ? "요약·결정사항" : "회의 내역"}
           </h1>
           {screen.name === "list" && (
             <button type="button" className="m-link" onClick={() => void api.signOut()}>로그아웃</button>
@@ -108,23 +196,35 @@ function MobileShell({ api, platform, session }: { api: MeetingApi; platform: Pl
 
         <main className="m-main">
           <ErrorText>{error}</ErrorText>
+          {notice && <p className="muted" role="status">{notice}</p>}
           {screen.name === "list" && (
             <MeetingListScreen meetings={meetings} jobs={jobs} onOpen={(id) => open({ name: "meeting", id })} onRefresh={reload} />
           )}
           {screen.name === "new" && (
             <NewMeetingForm
-              onCancel={back}
+              key={draftKey}
+              initial={draft}
+              onDraftChange={(d) => writeDraft(platform.deviceSettings, d)}
+              onCancel={() => {
+                clearDraft();
+                back();
+              }}
               onCreated={async (m) => {
+                clearDraft();
                 await reload();
                 open({ name: "meeting", id: m.id });
               }}
             />
           )}
-          {screen.name === "meeting" && meeting && <MeetingScreen key={meeting.id} meeting={meeting} onChanged={reload} />}
-          {screen.name === "meeting" && !meeting && <p className="muted">회의록을 찾을 수 없습니다.</p>}
+          {screen.name === "meeting" && meeting && (
+            <MeetingScreen key={meeting.id} meeting={meeting} onChanged={reload} onDeleted={back} />
+          )}
+          {screen.name === "meeting" && !meeting && meetings && <MissingMeeting />}
+          {screen.name === "meeting" && !meetings && <p className="muted">불러오는 중…</p>}
           {screen.name === "schedule" && (
             <ScheduleScreen meetings={meetings} pending={pending} onOpen={(id) => open({ name: "meeting", id })} onRefresh={reload} />
           )}
+          {screen.name === "summaries" && <SummariesView onOpenMeeting={(id) => open({ name: "meeting", id })} />}
         </main>
 
         <nav className="m-tabs" aria-label="메뉴">
@@ -138,6 +238,9 @@ function MobileShell({ api, platform, session }: { api: MeetingApi; platform: Pl
           <button type="button" aria-current={screen.name === "schedule" ? "page" : undefined}
             onClick={() => { open({ name: "schedule" }); void reload(); }}>
             일정 확인{reviewCount > 0 && <span className="m-count">{reviewCount}</span>}
+          </button>
+          <button type="button" aria-current={screen.name === "summaries" ? "page" : undefined} onClick={() => open({ name: "summaries" })}>
+            요약
           </button>
         </nav>
       </div>
@@ -163,7 +266,7 @@ function MeetingListScreen(props: {
         {props.meetings.map((m) => {
           const badge = jobBadge(props.jobs.get(m.id), m.revision_id);
           return (
-            <li key={m.id}>
+            <li key={m.id} className="m-meeting-item">
               <button type="button" onClick={() => props.onOpen(m.id)}>
                 <span className="m-list-main">
                   <span className="title">{m.title}</span>
@@ -171,6 +274,7 @@ function MeetingListScreen(props: {
                 </span>
                 <Badge tone={badge.tone}>{badge.label}</Badge>
               </button>
+              <DeleteMeetingButton compact meeting={m} onDeleted={props.onRefresh} />
             </li>
           );
         })}
@@ -181,15 +285,18 @@ function MeetingListScreen(props: {
 
 const MOBILE_LABELS: Record<string, string> = { run: "분석 요청", rerun: "재분석 요청", retry: "재시도" };
 
-function MeetingScreen({ meeting, onChanged }: { meeting: MeetingRow; onChanged: () => Promise<void> }) {
+function MeetingScreen({ meeting, onChanged, onDeleted }: { meeting: MeetingRow; onChanged: () => Promise<void>; onDeleted: () => void }) {
   const { api } = useApp();
   const { state, error, refresh } = useMeetingAnalysis(api, meeting.id);
   return (
     <>
       <article className="panel">
-        <h3>{meeting.title}</h3>
+        <div className="row between">
+          <h3>{meeting.title}</h3>
+          <DeleteMeetingButton meeting={meeting} onDeleted={onDeleted} />
+        </div>
         <p className="muted">{formatInZone(meeting.meeting_at, meeting.time_zone)} ({meeting.time_zone})</p>
-        <p className="body-text">{meeting.body || "(본문 없음)"}</p>
+        <MarkdownBody source={meeting.body} />
       </article>
       <ErrorText>{error}</ErrorText>
       {state && <AnalysisRequest state={state} refresh={async () => { await refresh(); await onChanged(); }} />}
@@ -206,18 +313,28 @@ function AnalysisRequest({ state, refresh }: { state: MeetingAnalysisState; refr
   const { api } = useApp();
   const flight = useRef(new SingleFlight()).current;
   const [pending, setPending] = useState(false);
-  const [confirming, setConfirming] = useState<"run" | "rerun" | null>(null);
+  const [confirming, setConfirmingState] = useState<"run" | "rerun" | null>(null);
+  const [instructions, setInstructions] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const view = analysisView(state, pending);
+  const setConfirming = (kind: "run" | "rerun" | null) => {
+    if (kind) setInstructions(initialInstructions(state, kind));
+    setConfirmingState(kind);
+  };
 
   async function execute(kind: "run" | "rerun" | "retry") {
     setPending(true);
     setError(null);
+    setNotice(null);
     try {
-      await flight.run(`analysis:${state.meeting.id}`, (op) =>
+      const job = await flight.run(`analysis:${state.meeting.id}`, (op) =>
         kind === "retry" && state.job
           ? api.retryAnalysis(op, state.job.id)
-          : api.requestAnalysis(op, state.meeting.id, state.meeting.revision_id, kind === "rerun" ? "rerun" : "initial"));
+          : api.requestAnalysis(op, state.meeting.id, state.meeting.revision_id, kind === "rerun" ? "rerun" : "initial", instructions));
+      if (kind !== "retry" && instructionsIgnored(job, instructions)) {
+        setNotice("이미 요청된 분석이 있어 새 요청사항은 적용되지 않았습니다.");
+      }
       setConfirming(null);
     } catch (e) {
       setError(errorMessage(e));
@@ -237,7 +354,8 @@ function AnalysisRequest({ state, refresh }: { state: MeetingAnalysisState; refr
       {state.job?.status === "queued" && <p className="muted">PC 앱이 켜져 있으면 곧 분석합니다. 이 화면은 자동으로 새로 고쳐집니다.</p>}
       {state.job?.status === "running" && <p className="muted">PC에서 분석하고 있습니다.</p>}
       {view.tone === "error" && view.message && <p className="error">{view.message}</p>}
-      {state.job?.status === "completed" && <p className="muted">분석이 끝났습니다. 아래 일정을 확인하세요. 요약·결정사항은 PC 앱에서 볼 수 있습니다.</p>}
+      {state.job?.status === "completed" && <p className="muted">분석이 끝났습니다. 아래 일정을 확인하세요. 요약·결정사항은 ‘요약’ 탭에서 볼 수 있습니다.</p>}
+      {state.job?.user_instructions && !confirming && <p className="muted">요청사항: {state.job.user_instructions}</p>}
 
       {confirming ? (
         <ConfirmBox
@@ -248,6 +366,7 @@ function AnalysisRequest({ state, refresh }: { state: MeetingAnalysisState; refr
           onCancel={() => setConfirming(null)}
         >
           <p>이 회의 원문을 PC의 Claude Code로 분석하도록 요청합니다. 원문은 Anthropic 서비스로 전송됩니다. PC 앱이 켜져 있어야 분석이 진행됩니다.</p>
+          <InstructionsField value={instructions} onChange={setInstructions} disabled={pending} />
         </ConfirmBox>
       ) : (
         <div className="row">
@@ -259,6 +378,7 @@ function AnalysisRequest({ state, refresh }: { state: MeetingAnalysisState; refr
           ))}
         </div>
       )}
+      {notice && <p className="muted" role="status">{notice}</p>}
       <ErrorText>{error}</ErrorText>
     </section>
   );

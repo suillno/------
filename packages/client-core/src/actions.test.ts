@@ -69,6 +69,13 @@ describe("candidateView", () => {
     expect(candidateView(cand(), { ...on, googleConnected: false }).approve?.enabled).toBe(false);
     expect(candidateView(cand(), { ...on, dirty: true }).approve?.reason).toBe("수정한 내용을 먼저 저장하세요");
   });
+  it("L03 목적지가 불명확하면 확인 전 승인을 막는다", () => {
+    const v = candidateView(cand({}, { location: "강남", location_uncertain: true }), on);
+    expect(v).toMatchObject({ statusLabel: "확인 필요", message: "목적지가 분명하지 않습니다. 확인하거나 고쳐 주세요." });
+    expect(v.approve).toMatchObject({ enabled: false });
+    expect(candidateView(cand({}, { location: "교대역", location_uncertain: false }), on).approve?.enabled).toBe(true);
+    expect(candidateView(cand({}, { location: null }), on).approve?.enabled).toBe(true);
+  });
   it("원문이 바뀐 후보는 승인할 수 없다", () => {
     expect(candidateView(cand({ stale: true }), on).approve?.enabled).toBe(false);
   });

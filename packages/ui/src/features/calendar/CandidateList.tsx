@@ -29,16 +29,20 @@ export function CandidateList({ state, refresh }: { state: MeetingAnalysisState;
   );
 }
 
-type Form = Pick<CandidatePayload, "title" | "start_local" | "end_local" | "time_zone" | "all_day" | "description">;
+type Form = Pick<CandidatePayload, "title" | "start_local" | "end_local" | "time_zone" | "all_day" | "description"> & { location: string | null };
 
 function toForm(p: CandidatePayload): Form {
-  return { title: p.title, start_local: p.start_local, end_local: p.end_local, time_zone: p.time_zone, all_day: p.all_day, description: p.description };
+  return {
+    title: p.title, start_local: p.start_local, end_local: p.end_local, time_zone: p.time_zone, all_day: p.all_day,
+    description: p.description, location: p.location ?? null,
+  };
 }
 
 function diff(form: Form, p: CandidatePayload): CandidatePatch {
   const patch: CandidatePatch = {};
   for (const k of Object.keys(form) as (keyof Form)[]) {
-    if (form[k] !== p[k]) (patch as Record<string, unknown>)[k] = form[k];
+    const current = k === "location" ? (p.location ?? null) : p[k];
+    if (form[k] !== current) (patch as Record<string, unknown>)[k] = form[k];
   }
   return patch;
 }
@@ -108,8 +112,18 @@ function CandidateCard({ candidate: c, refresh }: { candidate: EventCandidate; r
         <Badge tone={view.tone}>{pending === "approve" || pending === "retry" ? "등록 요청 중…" : view.statusLabel}</Badge>
       </div>
       <p className="muted">{describeWhen(c.payload)}</p>
+      {c.payload.location && <p className="muted">목적지: {c.payload.location}{c.payload.location_uncertain ? " (확인 필요)" : ""}</p>}
       {c.payload.evidence && <p className="evidence">근거: {c.payload.evidence}</p>}
       {view.message && <p className={view.tone === "error" ? "error" : "muted"}>{view.message}</p>}
+      {view.canEdit && c.payload.location_uncertain && !dirty && (
+        <p className="row">
+          <button type="button" disabled={pending !== null}
+            onClick={() => void act("save", (op) => api.patchCandidate(op, c.id, base.version, { location: c.payload.location ?? "" }))}>
+            이 목적지가 맞음
+          </button>
+          <span className="muted">아니면 아래 목적지를 고치거나 지우세요.</span>
+        </p>
+      )}
       {c.link?.html_link && (
         <p>
           <a href={c.link.html_link} onClick={(e) => { e.preventDefault(); void platform.openExternal(c.link!.html_link!); }}>
@@ -152,6 +166,14 @@ function CandidateCard({ candidate: c, refresh }: { candidate: EventCandidate; r
             </label>
           )}
           <label>
+            목적지 (원문에 있을 때만, 하나만)
+            <input value={form.location ?? ""} maxLength={200} placeholder="없으면 비워 두세요"
+              onChange={(e) => setForm({ ...form, location: e.target.value || null })} />
+            <span className="muted">
+              {form.location ? "승인하면 캘린더 '장소'에 넣고 설명에 네이버 지도 검색 링크를 추가합니다." : "목적지가 없으면 장소와 지도 링크를 넣지 않습니다."}
+            </span>
+          </label>
+          <label>
             설명 (선택)
             <textarea rows={2} maxLength={2000} value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value || null })} />
           </label>
@@ -176,6 +198,8 @@ function CandidateCard({ candidate: c, refresh }: { candidate: EventCandidate; r
           <dl className="summary">
             <dt>제목</dt><dd>{c.payload.title}</dd>
             <dt>일시</dt><dd>{describeWhen(c.payload)}</dd>
+            <dt>장소</dt><dd>{c.payload.location ? `${c.payload.location} (설명에 네이버 지도 링크)` : "없음"}</dd>
+            <dt>설명</dt><dd>‘원본 회의록 보기’ 링크 포함</dd>
             <dt>캘린더</dt><dd>기본 캘린더{google?.account_email ? ` (${google.account_email})` : ""}</dd>
           </dl>
           <p className="muted">이 내용 그대로 등록합니다. 참석자 초대·알림 메일은 보내지 않습니다.</p>

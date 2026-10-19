@@ -126,9 +126,13 @@ export function candidateView(c: EventCandidate, opts: { googleConnected: boolea
 
   // needs_review, rejected
   return {
-    statusLabel: c.status === "rejected" ? "거절됨" : c.payload.needs_confirmation ? "확인 필요" : "검토 필요",
+    statusLabel: c.status === "rejected" ? "거절됨" : c.payload.needs_confirmation || c.payload.location_uncertain ? "확인 필요" : "검토 필요",
     tone: "idle",
-    message: c.payload.needs_confirmation ? "AI가 날짜·시각을 확정하지 못했습니다. 직접 확인하세요." : null,
+    message: c.payload.needs_confirmation
+      ? "AI가 날짜·시각을 확정하지 못했습니다. 직접 확인하세요."
+      : c.payload.location_uncertain
+        ? "목적지가 분명하지 않습니다. 확인하거나 고쳐 주세요."
+        : null,
     canEdit: !lockedEdit,
     approve: approveButton(c, opts),
     retry: null,
@@ -141,6 +145,7 @@ function approveButton(c: EventCandidate, opts: { googleConnected: boolean; pend
   if (opts.pending) return { kind: "approve", label, enabled: false, reason: "요청을 처리하는 중입니다" };
   if (opts.dirty) return { kind: "approve", label, enabled: false, reason: "수정한 내용을 먼저 저장하세요" };
   if (!c.payload.start_local || !c.payload.end_local) return { kind: "approve", label, enabled: false, reason: "시작·종료 일시를 확정하세요" };
+  if (c.payload.location_uncertain) return { kind: "approve", label, enabled: false, reason: "목적지를 확인하세요(수정·삭제하거나 ‘이 목적지가 맞음’)" };
   if (!opts.googleConnected) return { kind: "approve", label, enabled: false, reason: "설정에서 Google 캘린더를 먼저 연결하세요" };
   return { kind: "approve", label, enabled: true };
 }
