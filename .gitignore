@@ -35,3 +35,6 @@ analysis-jobs/
 .idea/
 .DS_Store
 Thumbs.db
+
+# npm run build:android가 복사하는 휴대폰 설치 파일
+apps/mobile/*.apk

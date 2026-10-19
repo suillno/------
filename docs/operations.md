@@ -41,7 +41,7 @@
 
 1. 준비(한 번): Android Studio(SDK·NDK·Command-line Tools), 사용자 환경변수 `ANDROID_HOME`·`NDK_HOME`·`JAVA_HOME`(Android Studio 내장 JBR), `rustup target add aarch64-linux-android …`.
 2. Windows **개발자 모드를 켠다**(빌드할 때만 필요. Tauri가 라이브러리를 심볼릭 링크로 연결한다). `npm run build:android`가 꺼져 있으면 안내하고 멈춘다.
-3. `npm run build:android` → 디버그 서명 arm64 APK. 위치: `apps/mobile/src-tauri/gen/android/app/build/outputs/apk/`.
+3. `npm run build:android` → 디버그 서명 arm64 APK. 빌드가 끝나면 `apps/mobile/meeting-assistant.apk`로 복사된다(Git 제외).
 4. 휴대폰에 APK를 복사하고 "알 수 없는 앱 설치"를 허용해 설치한다.
 5. 빌드가 끝나면 개발자 모드는 꺼도 된다.
 

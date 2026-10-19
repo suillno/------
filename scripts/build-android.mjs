@@ -8,7 +8,7 @@
 // 빈 드라이브 문자 연결(subst)은 Rust 경로 정규화가 원래 경로로 되돌려 Tauri가 거부하므로 쓰지 않는다.
 // ANDROID_HOME·NDK_HOME·JAVA_HOME은 사용자 환경변수에서 읽는다(값을 출력하지 않는다).
 import { spawnSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const repoRoot = resolve(import.meta.dirname, "..");
@@ -61,7 +61,24 @@ const run = spawnSync("npx", args, {
 });
 const status = run.status ?? 1;
 
+// 빌드 결과는 gen/android 깊은 폴더에 생기므로, 가장 최근 APK를 apps/mobile/meeting-assistant.apk로 복사한다(Git 제외).
+function findApks(dir) {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+    const p = join(dir, e.name);
+    return e.isDirectory() ? findApks(p) : e.name.endsWith(".apk") ? [p] : [];
+  });
+}
+
 if (status === 0) {
-  console.log(`\nAPK 위치: ${join(repoRoot, "apps", "mobile", "src-tauri", "gen", "android", "app", "build", "outputs", "apk")}`);
+  const outputs = join(repoRoot, "apps", "mobile", "src-tauri", "gen", "android", "app", "build", "outputs", "apk");
+  const latest = findApks(outputs).sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)[0];
+  if (latest) {
+    const dest = join(repoRoot, "apps", "mobile", "meeting-assistant.apk");
+    copyFileSync(latest, dest);
+    console.log(`\nAPK: ${dest}`);
+  } else {
+    console.log(`\nAPK를 찾지 못했습니다. 빌드 출력 폴더: ${outputs}`);
+  }
 }
 process.exit(status);

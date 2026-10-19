@@ -19,7 +19,7 @@ AI 회의록·캘린더 연동 앱. 설계 기준은 [docs/design.md](docs/desig
 | 웹 개발 서버 | `npm run dev:web` (5173) |
 | 데스크톱 개발 | `npm run dev:desktop` (Vite 1420 + Tauri) |
 | 휴대폰 화면 개발 | `npm run dev:mobile` (Vite 1430, PC 브라우저에서 미리보기) |
-| 안드로이드 APK 빌드 | `npm run build:android` (디버그 서명, arm64). 사용자 환경변수 `ANDROID_HOME`·`NDK_HOME`·`JAVA_HOME` 필요 |
+| 안드로이드 APK 빌드 | `npm run build:android` (디버그 서명, arm64) → `apps/mobile/meeting-assistant.apk`. 사용자 환경변수 `ANDROID_HOME`·`NDK_HOME`·`JAVA_HOME` 필요 |
 | 타입 검사 | `npm run typecheck` |
 | TS 단위 테스트 | `npm test` |
 | 타입 검사 + TS 테스트 | `npm run check` |
