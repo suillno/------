@@ -59,14 +59,46 @@ describe.skipIf(!url || !anonKey)("로컬 Supabase 흐름", () => {
     const cand = after.candidates[0]!;
     expect(cand.status).toBe("needs_review");
 
-    // Google 비밀이 없는 로컬 서버는 승인 전에 503으로 멈춘다(승인·등록 없음)
+    // Google 비밀이 없으면 503, 있으면 이 사용자가 Google을 연결하지 않았으므로 409 GOOGLE_AUTH_REQUIRED.
+    // 어느 쪽이든 승인·등록은 일어나지 않아야 한다(C01).
     const err = await api.approveAndRegister(crypto.randomUUID(), cand).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ApiRequestError);
-    expect((err as ApiRequestError).status).toBe(503);
+    const e = err as ApiRequestError;
+    expect(e.status === 503 || (e.status === 409 && e.code === "GOOGLE_AUTH_REQUIRED")).toBe(true);
     expect((await api.getAnalysisState(meeting.id)).candidates[0]!.status).toBe("needs_review");
 
     const conn = await api.getGoogleConnection();
     expect(conn.connected).toBe(false);
+
+    // S01 분석이 끝난 회의는 요약 목록에 자동으로 나온다
+    const summaries = await api.listSummaries();
+    expect(summaries.map((s) => s.meeting_id)).toEqual([meeting.id]);
+    expect(summaries[0]!.summary_preview).toBe("통합 테스트 요약");
+
+    // D02 영구 삭제 → 목록·요약에서 사라지고 상세는 NOT_FOUND
+    const purged = await api.purgeMeeting(crypto.randomUUID(), meeting.id, meeting.version);
+    expect(purged).toMatchObject({ id: meeting.id, purged: true, registered_events_kept: 0 });
+    expect((await api.listMeetings()).some((m) => m.id === meeting.id)).toBe(false);
+    expect(await api.listSummaries()).toEqual([]);
+    const gone = await api.getAnalysisState(meeting.id).catch((e: unknown) => e);
+    expect(gone).toBeInstanceOf(ApiRequestError);
+    expect((gone as ApiRequestError).code).toBe("NOT_FOUND");
+    await api.signOut();
+  }, 30_000);
+
+  it("I02 분석 요청사항을 작업에 보관하고 PC가 원문과 따로 받는다", async () => {
+    const api = createSupabaseMeetingApi({ url: url!, anonKey: anonKey!, storage: memoryStorage() });
+    const email = `it-${crypto.randomUUID()}@test.invalid`;
+    await api.signUp(email, "local-only-password");
+    await api.signIn(email, "local-only-password");
+    const meeting = await api.createMeeting(crypto.randomUUID(), {
+      title: "요청사항 테스트", body: "본문", meeting_at: localToInstant("2026-10-16T10:00", "Asia/Seoul")!, time_zone: "Asia/Seoul",
+    });
+    const job = await api.requestAnalysis(crypto.randomUUID(), meeting.id, meeting.revision_id, "initial", "  결정사항만 짧게  ");
+    expect(job.user_instructions).toBe("결정사항만 짧게");
+    const claimed = await api.claimAnalysis("pc-it");
+    expect(claimed?.input).toMatchObject({ body: "본문", user_instructions: "결정사항만 짧게" });
+    await api.purgeMeeting(crypto.randomUUID(), meeting.id, meeting.version);
     await api.signOut();
   }, 30_000);
 

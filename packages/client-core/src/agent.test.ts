@@ -7,7 +7,7 @@ const payload: AnalysisResultV1 = { schema_version: 1, summary: "s", decisions: 
 const claimed: ClaimedAnalysis = {
   job: { id: "job-1" } as ClaimedAnalysis["job"],
   lease_token: "lease-1",
-  input: { meeting_id: "m", source_revision_id: "rev", title: "t", body: "b", meeting_at: "", meeting_local_date: "2026-10-16", time_zone: "Asia/Seoul" },
+  input: { meeting_id: "m", source_revision_id: "rev", title: "t", body: "b", meeting_at: "", meeting_local_date: "2026-10-16", time_zone: "Asia/Seoul", user_instructions: null },
 };
 const saved: SavedAnalysis = {
   job_id: "job-1", lease_token: "lease-1", source_revision_id: "rev", payload,

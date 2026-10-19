@@ -12,6 +12,7 @@
     "@meeting/client-core": "^0.0.0",
     "@meeting/ui": "^0.0.0",
     "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/plugin-deep-link": "2.6.1",
     "@tauri-apps/plugin-opener": "2.7.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"

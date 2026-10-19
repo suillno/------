@@ -13,7 +13,9 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
-tauri-plugin-single-instance = "2"
+# deep-link 기능: 두 번째 실행으로 들어온 meetingassistant:// 링크를 이미 떠 있는 창으로 넘긴다
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+tauri-plugin-deep-link = "2"
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

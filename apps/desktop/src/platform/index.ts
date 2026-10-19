@@ -1,7 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { createSupabaseMeetingApi, type AnalysisRunner, type SavedAnalysis, type RunOutcome } from "@meeting/client-core";
-import { isAllowedExternalUrl, storageSettings, type Platform, type PlatformStatus } from "@meeting/ui";
+import { createMeetingLinkInbox, isAllowedExternalUrl, storageSettings, type Platform, type PlatformStatus } from "@meeting/ui";
 
 // Tauri IPC 클라이언트. 허용된 명령만 호출한다 (src-tauri/src/commands).
 
@@ -22,6 +23,14 @@ const analysisRunner: AnalysisRunner = {
   },
 };
 
+const deviceSettings = storageSettings(() => window.localStorage);
+
+// 캘린더 ‘원본 회의록 보기’ 딥링크. 앱을 링크로 처음 켰을 때(getCurrent)와 켜져 있을 때(onOpenUrl) 모두 받는다.
+// 회의 UUID만 꺼내 기기에 보관하고, 로그인한 화면이 꺼내 연다.
+const meetingLinks = createMeetingLinkInbox(deviceSettings);
+void getCurrent().then((urls) => urls?.forEach((u) => meetingLinks.push(u))).catch(() => undefined);
+void onOpenUrl((urls) => urls.forEach((u) => meetingLinks.push(u))).catch(() => undefined);
+
 export const platform: Platform = {
   async getStatus() {
     return invoke<PlatformStatus>("app_status");
@@ -39,5 +48,6 @@ export const platform: Platform = {
       await openUrl(target);
     }
   },
-  deviceSettings: storageSettings(() => window.localStorage),
+  deviceSettings,
+  meetingLinks,
 };

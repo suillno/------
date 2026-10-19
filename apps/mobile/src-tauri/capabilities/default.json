@@ -1,16 +1,25 @@
 {
   "$schema": "../gen/schemas/mobile-schema.json",
   "identifier": "default",
-  "description": "휴대폰 앱 최소 권한. 파일·셸·프로세스 권한을 추가하지 않는다. 외부 URL은 Google 캘린더 화면만 연다.",
-  "windows": ["main"],
+  "description": "휴대폰 앱 최소 권한. 파일·셸·프로세스 권한을 추가하지 않는다. 외부 URL은 Google 캘린더 화면만 연다. 원본 회의록 딥링크(meetingassistant://meeting/<UUID>)만 받는다.",
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
+    "deep-link:default",
     {
       "identifier": "opener:allow-open-url",
       "allow": [
-        { "url": "https://calendar.google.com/*" },
-        { "url": "https://www.google.com/calendar/*" },
-        { "url": "https://accounts.google.com/*" }
+        {
+          "url": "https://calendar.google.com/*"
+        },
+        {
+          "url": "https://www.google.com/calendar/*"
+        },
+        {
+          "url": "https://accounts.google.com/*"
+        }
       ]
     }
   ]

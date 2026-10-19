@@ -54,6 +54,8 @@ export interface ClaimedAnalysis {
     meeting_at: string;
     meeting_local_date: string;
     time_zone: string;
+    /** 사용자의 추가 요청사항(없으면 null). 원문(body)과 섞지 않고 CLI stdin의 별도 필드로 넘긴다 */
+    user_instructions: string | null;
   };
 }
 

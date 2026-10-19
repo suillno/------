@@ -6,6 +6,8 @@ pub fn run() {
     tauri::Builder::default()
         // 외부 URL은 capabilities/default.json의 Google 캘린더 주소만 연다
         .plugin(tauri_plugin_opener::init())
+        // 캘린더 ‘원본 회의록 보기’ 링크(meetingassistant://meeting/<UUID>). 화면이 회의 UUID만 꺼내 쓴다.
+        .plugin(tauri_plugin_deep_link::init())
         .run(tauri::generate_context!())
         .expect("Tauri 애플리케이션 실행 실패");
 }
