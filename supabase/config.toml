@@ -418,3 +418,7 @@ enabled = true
 # 나머지 함수(calendar-register 등)는 기본값대로 게이트웨이가 JWT를 검사한다.
 [functions.google-oauth-callback]
 verify_jwt = false
+
+# 일정 설명의 '원본 회의록 보기' 링크. 로그인 없이 열리며 회의 UUID 형식만 검사해 앱으로 넘긴다.
+[functions.open-meeting]
+verify_jwt = false

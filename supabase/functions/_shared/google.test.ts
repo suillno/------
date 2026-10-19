@@ -5,6 +5,8 @@ import {
   buildEventBody,
   googleEventIdForApproval,
   insertApprovedEvent,
+  meetingLinkUrl,
+  naverMapSearchUrl,
   refreshAccessToken,
   type CandidatePayload,
   type GoogleConfig,
@@ -54,6 +56,30 @@ describe("buildEventBody", () => {
     const body = buildEventBody({ ...timed, all_day: true, start_local: "2026-10-31", end_local: "2026-10-31" }, APPROVAL);
     expect(body.start).toEqual({ date: "2026-10-31" });
     expect(body.end).toEqual({ date: "2026-11-01" });
+  });
+
+  it("L01 목적지가 없으면 장소·지도 링크를 넣지 않는다", () => {
+    const body = buildEventBody({ ...timed, location: null }, APPROVAL);
+    expect(body).not.toHaveProperty("location");
+    expect(body.description).not.toContain("map.naver.com");
+    const blank = buildEventBody({ ...timed, location: "   " }, APPROVAL);
+    expect(blank).not.toHaveProperty("location");
+  });
+
+  it("L02 확인된 목적지는 장소와 네이버 지도 검색 링크로 넣는다", () => {
+    const body = buildEventBody({ ...timed, location: "교대역 2번 출구" }, APPROVAL);
+    expect(body.location).toBe("교대역 2번 출구");
+    expect(body.description).toContain(`네이버 지도: ${naverMapSearchUrl("교대역 2번 출구")}`);
+    expect(naverMapSearchUrl("교대역 2번 출구")).toBe("https://map.naver.com/p/search/%EA%B5%90%EB%8C%80%EC%97%AD%202%EB%B2%88%20%EC%B6%9C%EA%B5%AC");
+  });
+
+  it("O 원본 회의록 링크는 목적지와 관계없이 넣고 회의 UUID만 담는다", () => {
+    const meeting = "cccccccc-0000-4000-8000-000000000001";
+    const url = meetingLinkUrl("https://example.supabase.co/functions/v1/", meeting);
+    expect(url).toBe(`https://example.supabase.co/functions/v1/open-meeting?m=${meeting}`);
+    const body = buildEventBody({ ...timed, location: null }, APPROVAL, { meetingUrl: url });
+    expect(body.description).toContain(`원본 회의록 보기: ${url}`);
+    expect(() => meetingLinkUrl("https://x", "../../etc")).toThrow();
   });
 
   it("확정되지 않은 일정은 만들지 않는다", () => {

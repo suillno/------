@@ -7,6 +7,7 @@ import {
   DEFAULT_SCOPES,
   buildAuthUrl,
   buildEventBody,
+  meetingLinkUrl,
   exchangeCode,
   insertApprovedEvent,
   refreshAccessToken,
@@ -29,7 +30,17 @@ export interface ServerEnv {
    */
   appWebOrigin: string | null;
   allowedOrigins: string[];
+  /**
+   * 이용자가 여는 Edge Function 기본 주소(https://<project>.supabase.co/functions/v1).
+   * 일정 설명의 '원본 회의록 보기' 링크에 쓴다. 새 비밀 없이 GOOGLE_OAUTH_REDIRECT_URI에서 만든다.
+   */
+  functionsBaseUrl: string | null;
   fetch: typeof fetch;
+}
+
+/** OAuth 콜백 주소(…/functions/v1/google-oauth-callback)에서 공개 함수 기본 주소를 만든다. 형식이 다르면 null */
+export function functionsBaseUrlFrom(redirectUri: string | undefined): string | null {
+  return redirectUri && /\/functions\/v1\/[^/]+$/.test(redirectUri) ? redirectUri.replace(/\/[^/]+$/, "") : null;
 }
 
 export function loadServerEnv(get: (name: string) => string | undefined, fetchImpl: typeof fetch = fetch): ServerEnv {
@@ -52,6 +63,7 @@ export function loadServerEnv(get: (name: string) => string | undefined, fetchIm
       ? { clientId, clientSecret, redirectUri, scopes: scopes.length ? scopes : DEFAULT_SCOPES }
       : null,
     tokenEncryptionKey: get("TOKEN_ENCRYPTION_KEY"),
+    functionsBaseUrl: functionsBaseUrlFrom(redirectUri),
     appWebOrigin,
     allowedOrigins: [
       ...(appWebOrigin ? [appWebOrigin] : []),
@@ -144,6 +156,7 @@ type ClaimResult =
       job_id: string;
       lease_token: string;
       approval_id: string;
+      meeting_id: string;
       calendar_id: string;
       payload: CandidatePayload;
       refresh_token_ciphertext: string;
@@ -182,7 +195,9 @@ export async function processCalendarJob(env: ServerEnv, userId: string, jobId: 
   const access = await refreshAccessToken(cfg, refreshToken);
   if (!access.ok) return fail(access.code, access.message);
 
-  const result = await insertApprovedEvent(cfg, access.value, claim.calendar_id, buildEventBody(claim.payload, claim.approval_id));
+  const result = await insertApprovedEvent(cfg, access.value, claim.calendar_id, buildEventBody(claim.payload, claim.approval_id, {
+    meetingUrl: env.functionsBaseUrl ? meetingLinkUrl(env.functionsBaseUrl, claim.meeting_id) : null,
+  }));
   if (!result.ok) return fail(result.code, result.message);
 
   await rpc(svc, "svc_calendar_job_complete", {
@@ -356,4 +371,54 @@ export async function handleDisconnect(req: Request, env: ServerEnv): Promise<Re
   } catch (e) {
     return rpcFailure(req, env, e);
   }
+}
+
+// ───────────────────────── 원본 회의록 열기 ─────────────────────────
+
+const OPEN_MEETING_TEXT = [
+  "회의 어시스턴트에서 이 일정을 만든 회의록을 엽니다.",
+  "",
+  "앱이 열리지 않으면:",
+  "- 휴대폰: 회의 어시스턴트 앱을 설치했는지 확인하세요.",
+  "- PC: 회의 어시스턴트를 한 번 실행한 뒤 링크를 다시 누르세요.",
+  "",
+  "로그인 전이면 로그인한 뒤 해당 회의로 이동합니다. 삭제됐거나 볼 수 없는 회의록이면 앱이 안내합니다.",
+].join("\n");
+
+const ANDROID_PACKAGE = "app.meetingassistant.mobile";
+
+/**
+ * GET open-meeting?m=<회의 UUID> — Google 캘린더 일정 설명의 '원본 회의록 보기' 링크.
+ * JWT 없이 동작하며 DB를 조회하지 않는다(회의 존재 여부를 드러내지 않는다). 권한 검사는 앱이 로그인 사용자로 한다.
+ * 안드로이드는 intent URL로, PC는 meetingassistant:// 스킴으로 앱에 넘긴다. 앱이 없으면 안내 문구를 보인다.
+ */
+/** functionsBaseUrl: 공개 함수 주소(대체 안내 페이지용). 모르면 null(대체 주소 없이 앱으로만 넘긴다) */
+export function handleOpenMeeting(req: Request, functionsBaseUrl: string | null): Response {
+  const text = (body: string, status = 200) =>
+    new Response(`${body}\n`, {
+      status,
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer",
+      },
+    });
+  if (req.method !== "GET") return new Response(null, { status: 405 });
+  const url = new URL(req.url);
+  const id = url.searchParams.get("m") ?? "";
+  if (!UUID.test(id)) return text("잘못된 회의록 링크입니다.", 400);
+  if (url.searchParams.has("fallback")) return text(OPEN_MEETING_TEXT);
+
+  const deepLink = `meetingassistant://meeting/${id}`;
+  const ua = req.headers.get("User-Agent") ?? "";
+  if (/Android/i.test(ua)) {
+    // 앱이 없으면 안드로이드가 대체 주소(같은 함수의 안내 문구)를 연다
+    const fallback = functionsBaseUrl
+      ? `S.browser_fallback_url=${encodeURIComponent(`${functionsBaseUrl}/open-meeting?m=${id}&fallback=1`)};`
+      : "";
+    const intent = `intent://meeting/${id}#Intent;scheme=meetingassistant;package=${ANDROID_PACKAGE};${fallback}end`;
+    return new Response(null, { status: 302, headers: { Location: intent, "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } });
+  }
+  return new Response(null, { status: 302, headers: { Location: deepLink, "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } });
 }

@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { encryptSecret, importTokenKey, sha256Hex } from "./crypto.ts";
 import { APPROVAL_PROPERTY } from "./google.ts";
 import {
+  functionsBaseUrlFrom,
   handleCalendarRegister,
   handleOAuthCallback,
   handleOAuthStart,
+  handleOpenMeeting,
   loadServerEnv,
   processCalendarJob,
   type ServerEnv,
@@ -47,7 +49,8 @@ const userRoute: Route = (call) =>
 
 async function claimOk() {
   return {
-    ok: true, job_id: JOB, lease_token: "lease", approval_id: APPROVAL, calendar_id: "primary", payload,
+    ok: true, job_id: JOB, lease_token: "lease", approval_id: APPROVAL, meeting_id: "dddddddd-0000-4000-8000-000000000009",
+    calendar_id: "primary", payload,
     refresh_token_ciphertext: await encryptSecret(await importTokenKey(KEY), "refresh-1"),
   };
 }
@@ -76,6 +79,9 @@ describe("processCalendarJob", () => {
     expect(calls[1]!.body).toContain("refresh_token=refresh-1");
     const inserted = JSON.parse(calls[2]!.body!);
     expect(inserted.extendedProperties.private[APPROVAL_PROPERTY]).toBe(APPROVAL);
+    // 원본 회의록 링크: 공개 함수 주소 + 회의 UUID (목적지 없는 일정에도 넣는다)
+    expect(inserted.description).toContain("원본 회의록 보기: http://supabase.test/functions/v1/open-meeting?m=dddddddd-0000-4000-8000-000000000009");
+    expect(inserted).not.toHaveProperty("location");
   });
 
   it("재검사에서 막히면 Google을 호출하지 않는다", async () => {
@@ -240,5 +246,43 @@ describe("loadServerEnv", () => {
   it("Google 비밀이 없으면 연동을 끈 상태로 시작한다", () => {
     const e: ServerEnv = env([], { GOOGLE_OAUTH_CLIENT_ID: undefined }).env;
     expect(e.google).toBeNull();
+  });
+});
+
+describe("open-meeting (원본 회의록 링크)", () => {
+  const meeting = "cccccccc-0000-4000-8000-000000000001";
+  const base = "https://example.supabase.co/functions/v1";
+  const req = (q: string, ua = "Mozilla/5.0 (Windows NT 10.0)") =>
+    new Request(`http://internal/open-meeting${q}`, { headers: { "User-Agent": ua } });
+
+  it("O PC는 meetingassistant:// 스킴으로 넘긴다", () => {
+    const res = handleOpenMeeting(req(`?m=${meeting}`), base);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe(`meetingassistant://meeting/${meeting}`);
+  });
+
+  it("O 안드로이드는 앱 패키지를 지정한 intent로 넘기고 앱이 없으면 안내 주소로 간다", () => {
+    const res = handleOpenMeeting(req(`?m=${meeting}`, "Mozilla/5.0 (Linux; Android 15)"), base);
+    const loc = res.headers.get("Location")!;
+    expect(loc.startsWith(`intent://meeting/${meeting}#Intent;scheme=meetingassistant;package=app.meetingassistant.mobile;`)).toBe(true);
+    expect(decodeURIComponent(loc)).toContain(`${base}/open-meeting?m=${meeting}&fallback=1`);
+  });
+
+  it("O04 UUID가 아니면 거절하고 입력값을 응답에 넣지 않는다", async () => {
+    const res = handleOpenMeeting(req("?m=%3Cscript%3E"), base);
+    expect(res.status).toBe(400);
+    expect(await res.text()).not.toContain("script");
+  });
+
+  it("앱이 없을 때 안내 문구", async () => {
+    const res = handleOpenMeeting(req(`?m=${meeting}&fallback=1`), base);
+    expect(res.headers.get("Content-Type")).toBe("text/plain; charset=utf-8");
+    expect(await res.text()).toContain("앱이 열리지 않으면");
+  });
+
+  it("공개 함수 주소는 OAuth 콜백 주소에서 만든다", () => {
+    expect(functionsBaseUrlFrom(`${base}/google-oauth-callback`)).toBe(base);
+    expect(functionsBaseUrlFrom("https://evil.test/callback")).toBeNull();
+    expect(functionsBaseUrlFrom(undefined)).toBeNull();
   });
 });

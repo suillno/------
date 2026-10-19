@@ -19,6 +19,9 @@ export interface CandidatePayload {
   evidence: string | null;
   needs_confirmation: boolean;
   description: string | null;
+  /** 확인된 목적지명(schema v2). v1 후보·목적지 없는 일정은 없음/null */
+  location?: string | null;
+  location_uncertain?: boolean;
 }
 
 export interface GoogleConfig {
@@ -56,19 +59,43 @@ export interface GoogleEventBody {
   id: string;
   summary: string;
   description: string;
+  /** 확인된 목적지가 있을 때만 넣는다 */
+  location?: string;
   start: { date: string } | { dateTime: string; timeZone: string };
   end: { date: string } | { dateTime: string; timeZone: string };
   extendedProperties: { private: Record<string, string> };
 }
 
+/** 네이버 지도 검색 링크. 장소 선택·현재 위치 기준 길찾기는 네이버 지도에서 한다(앱은 좌표·경로를 다루지 않는다). */
+export function naverMapSearchUrl(location: string): string {
+  return `https://map.naver.com/p/search/${encodeURIComponent(location)}`;
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** '원본 회의록 보기' 링크. 회의 UUID만 넣는다(본문·토큰 없음). 실제 이동은 open-meeting 함수와 앱 딥링크가 한다. */
+export function meetingLinkUrl(functionsBaseUrl: string, meetingId: string): string {
+  if (!UUID_RE.test(meetingId)) throw new Error("meeting_id는 UUID여야 합니다");
+  return `${functionsBaseUrl.replace(/\/$/, "")}/open-meeting?m=${meetingId}`;
+}
+
+export interface EventLinks {
+  /** 원본 회의록 링크. 목적지와 관계없이 모든 일정에 넣는다 */
+  meetingUrl?: string | null;
+}
+
 /**
- * 승인 snapshot을 Google 이벤트로 바꾼다. 서버가 승인 시 시각을 검증했으므로 여기서는 형식만 변환한다.
+ * 승인 snapshot을 Google 이벤트로 바꾼다. 서버가 승인 시 시각·목적지 확인을 검증했으므로 여기서는 형식만 변환한다.
  * 종일 일정의 end_local은 마지막 날(포함)이므로 Google의 배타적 종료일로 하루 더한다.
+ * 목적지가 있을 때만 장소와 네이버 지도 링크를 넣는다(추측·기본 장소 없음).
  */
-export function buildEventBody(payload: CandidatePayload, approvalId: string): GoogleEventBody {
+export function buildEventBody(payload: CandidatePayload, approvalId: string, links: EventLinks = {}): GoogleEventBody {
   if (!payload.start_local || !payload.end_local) throw new Error("확정되지 않은 일정은 등록할 수 없습니다");
+  const location = payload.location && payload.location.trim() ? payload.location.trim() : null;
   const description = [
     payload.description,
+    links.meetingUrl ? `원본 회의록 보기: ${links.meetingUrl}` : null,
+    location ? `네이버 지도: ${naverMapSearchUrl(location)}` : null,
     payload.evidence ? `회의록 근거: ${payload.evidence}` : null,
     "회의 어시스턴트에서 승인한 일정입니다.",
   ]
@@ -78,6 +105,7 @@ export function buildEventBody(payload: CandidatePayload, approvalId: string): G
     id: googleEventIdForApproval(approvalId),
     summary: payload.title,
     description,
+    ...(location ? { location } : {}),
     extendedProperties: { private: { [APPROVAL_PROPERTY]: approvalId } },
   };
   if (payload.all_day) {
