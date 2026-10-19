@@ -52,6 +52,19 @@ describe("runOneAnalysis", () => {
     expect(f.api.retryAnalysis).not.toHaveBeenCalled();
   });
 
+  it("작업을 가져오면 실행 전에 onStart로 알린다(화면을 바로 '실행 중'으로)", async () => {
+    const f = fakes();
+    const order: string[] = [];
+    vi.mocked(f.runner.run).mockImplementationOnce(async () => (order.push("run"), { ok: true, saved }));
+    await runOneAnalysis(f.typedApi, f.runner, { userId: "u", deviceId: "pc", onStart: () => order.push("start") });
+    expect(order).toEqual(["start", "run"]);
+
+    f.api.claimAnalysis.mockResolvedValueOnce(null);
+    const onStart = vi.fn();
+    await runOneAnalysis(f.typedApi, f.runner, { userId: "u", deviceId: "pc", onStart });
+    expect(onStart).not.toHaveBeenCalled();
+  });
+
   it("실행 → 업로드 → 로컬 저장본 정리", async () => {
     const f = fakes();
     expect(await runOneAnalysis(f.typedApi, f.runner, { userId: "u", deviceId: "pc", jobId: "job-1" })).toBe("completed");

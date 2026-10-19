@@ -137,6 +137,7 @@ function MainShell({ api, platform, session }: { api: MeetingApi; platform: Plat
       userId: session.userId,
       deviceId: deviceId(platform),
       // 처리 결과를 열려 있는 회의록 화면에 바로 반영한다
+      onStart: () => window.dispatchEvent(new Event(ANALYSIS_UPDATED_EVENT)),
       onResult: (r) => r !== "idle" && window.dispatchEvent(new Event(ANALYSIS_UPDATED_EVENT)),
     });
     loop.start();

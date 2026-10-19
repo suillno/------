@@ -54,6 +54,8 @@ export interface RunOptions {
   /** 특정 작업만 처리할 때(이 PC에서 방금 누른 버튼) */
   jobId?: string;
   heartbeatMs?: number;
+  /** 작업을 가져와 실행을 시작할 때(화면을 '실행 중'으로 바로 바꾸기 위해) */
+  onStart?: () => void;
 }
 
 /**
@@ -68,7 +70,7 @@ export class AnalysisAgentLoop {
   constructor(
     private readonly api: MeetingApi,
     private readonly runner: AnalysisRunner,
-    private readonly opts: { userId: string; deviceId: string; intervalMs?: number; onResult?: (r: AgentResult) => void },
+    private readonly opts: { userId: string; deviceId: string; intervalMs?: number; onStart?: () => void; onResult?: (r: AgentResult) => void },
   ) {}
 
   start(): void {
@@ -86,7 +88,7 @@ export class AnalysisAgentLoop {
     if (this.busy) return "busy";
     this.busy = true;
     try {
-      const result = await runOneAnalysis(this.api, this.runner, { userId: this.opts.userId, deviceId: this.opts.deviceId, jobId });
+      const result = await runOneAnalysis(this.api, this.runner, { userId: this.opts.userId, deviceId: this.opts.deviceId, jobId, onStart: this.opts.onStart });
       this.opts.onResult?.(result);
       return result;
     } catch {
@@ -103,6 +105,7 @@ export async function runOneAnalysis(api: MeetingApi, runner: AnalysisRunner, op
 
   const claimed = await api.claimAnalysis(opts.deviceId, opts.jobId);
   if (!claimed) return "idle";
+  opts.onStart?.();
 
   const heartbeat = setInterval(() => {
     api.heartbeatAnalysis(claimed.job.id, claimed.lease_token).catch(() => undefined);
