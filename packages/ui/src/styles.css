@@ -175,6 +175,11 @@ button.danger { border-color: var(--err); color: var(--err); }
 button.danger-link { border: 0; background: none; color: var(--err); padding: 4px 6px; font-size: 0.875rem; }
 .meeting-item { display: flex; align-items: center; gap: 4px; }
 .meeting-item > button:first-child { flex: 1; min-width: 0; }
+/* .meeting-list button의 width: 100%가 삭제 버튼에 걸리지 않게 하고, 확인창은 아래 줄 전체를 쓴다 */
+.meeting-item { flex-wrap: wrap; }
+.meeting-item > button:not(:first-child) { flex: none; width: auto; white-space: nowrap; }
+.meeting-item > div { flex-basis: 100%; }
+.meeting-item .confirm button { width: auto; display: inline-flex; flex-direction: row; }
 
 .md-editor { margin: 8px 0; }
 .md-label { font-size: 0.875rem; }
