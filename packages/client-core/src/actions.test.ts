@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AnalysisJob, EventCandidate, MeetingAnalysisState } from "@meeting/contracts";
-import { analysisView, candidateView, jobBadge, SingleFlight } from "./actions";
+import { analysisView, approveAllSequentially, candidateView, jobBadge, planBulkApprove, SingleFlight } from "./actions";
 import { ApiRequestError } from "./api";
 
 const REV = "11111111-0000-4000-8000-000000000001";
@@ -155,5 +155,54 @@ describe("jobBadge", () => {
   });
   it("원문이 바뀐 뒤의 완료는 이전 원문 기준으로 표시한다", () => {
     expect(jobBadge(job("completed"), "22222222-0000-4000-8000-000000000002", now).label).toBe("완료 (이전 원문)");
+  });
+});
+
+describe("planBulkApprove", () => {
+  it("거절·등록 완료·승인된 후보는 빼고, 승인 가능한 후보만 대상으로 한다", () => {
+    const list = [
+      cand({ id: "a" }),
+      cand({ id: "rej", status: "rejected" }),
+      cand({ id: "done", status: "registered" }),
+      cand({ id: "appr", status: "approved" }),
+      cand({ id: "loc" }, { location: "강남역", location_uncertain: true }),
+      cand({ id: "nodate" }, { start_local: null, end_local: null, needs_confirmation: true }),
+      cand({ id: "old", stale: true }),
+      cand({ id: "edit" }),
+    ];
+    const plan = planBulkApprove(list, { googleConnected: true, dirtyIds: new Set(["edit"]) });
+    expect(plan.targets.map((c) => c.id)).toEqual(["a"]);
+    expect(plan.skipped.map((s) => s.candidate.id)).toEqual(["loc", "nodate", "old", "edit"]);
+    expect(plan.skipped.find((s) => s.candidate.id === "edit")?.reason).toBe("수정한 내용을 먼저 저장하세요");
+  });
+
+  it("Google 연결 전에는 대상이 없다", () => {
+    expect(planBulkApprove([cand()], { googleConnected: false }).targets).toEqual([]);
+  });
+
+  it("재시도할 수 있는 등록 실패 후보는 ‘재시도’로 안내하고 빼낸다", () => {
+    const failed = cand({ status: "failed", calendar_job: { id: "j", status: "failed", last_error_code: "GOOGLE_UNAVAILABLE" } as EventCandidate["calendar_job"] });
+    const plan = planBulkApprove([failed], { googleConnected: true });
+    expect(plan.targets).toEqual([]);
+    expect(plan.skipped[0]!.reason).toContain("재시도");
+  });
+});
+
+describe("approveAllSequentially", () => {
+  it("후보마다 다른 operation_id로 차례로 등록하고, 실패해도 나머지를 계속하며 다시 실행하지 않는다", async () => {
+    const calls: { op: string; id: string }[] = [];
+    const api = {
+      approveAndRegister: vi.fn(async (op: string, c: { id: string }) => {
+        calls.push({ op, id: c.id });
+        if (c.id === "b") throw new ApiRequestError(409, { error: { code: "CONFLICT" as never, message: "", request_id: "r" } });
+        return { status: "succeeded" as const };
+      }),
+    };
+    const progress: number[] = [];
+    const results = await approveAllSequentially(api, new SingleFlight(), [cand({ id: "a" }), cand({ id: "b" }), cand({ id: "c" })], (d) => progress.push(d));
+    expect(calls.map((c) => c.id)).toEqual(["a", "b", "c"]);
+    expect(new Set(calls.map((c) => c.op)).size).toBe(3);
+    expect(results.map((r) => r.status)).toEqual(["succeeded", "failed", "succeeded"]);
+    expect(progress).toEqual([1, 2, 3]);
   });
 });

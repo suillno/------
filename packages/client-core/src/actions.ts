@@ -214,3 +214,60 @@ export function jobBadge(
       return { label: job.status, tone: "idle" };
   }
 }
+
+// ───────── '모두 승인하고 캘린더 등록' ─────────
+
+export interface BulkApprovePlan {
+  /** 지금 그대로 등록할 수 있는 후보 */
+  targets: EventCandidate[];
+  /** 승인할 수 없어 빠지는 후보와 사유(거절·등록 완료·등록 중인 후보는 목록에 넣지 않는다) */
+  skipped: { candidate: EventCandidate; reason: string }[];
+}
+
+/**
+ * 한 번에 승인할 후보를 고른다. 개별 '승인하고 캘린더 등록' 버튼과 같은 규칙(candidateView)을 쓴다.
+ * 거절한 후보는 대상에서 빼고, 수정 중(저장 안 함)인 후보는 화면에 보이는 값과 서버 값이 달라 뺀다.
+ */
+export function planBulkApprove(
+  candidates: EventCandidate[],
+  opts: { googleConnected: boolean; dirtyIds?: ReadonlySet<string> },
+): BulkApprovePlan {
+  const plan: BulkApprovePlan = { targets: [], skipped: [] };
+  for (const c of candidates) {
+    if (c.status === "rejected" || c.status === "registered" || c.status === "registering" || c.status === "approved") continue;
+    const view = candidateView(c, { googleConnected: opts.googleConnected, pending: false, dirty: opts.dirtyIds?.has(c.id) });
+    if (view.approve?.enabled) plan.targets.push(c);
+    else if (view.retry) plan.skipped.push({ candidate: c, reason: "등록에 실패한 후보입니다. ‘재시도’를 누르세요" });
+    else plan.skipped.push({ candidate: c, reason: view.approve?.reason ?? "승인할 수 없는 후보입니다" });
+  }
+  return plan;
+}
+
+export interface BulkApproveResult {
+  candidate: EventCandidate;
+  status: "succeeded" | "running" | "failed";
+  error?: unknown;
+}
+
+/**
+ * 확인창에서 승인한 후보를 하나씩 차례로 등록한다(후보마다 별도 operation_id, 같은 후보 중복 클릭은 SingleFlight가 막는다).
+ * 하나가 실패해도 나머지는 계속하고, 실패한 후보는 자동으로 다시 실행하지 않는다.
+ */
+export async function approveAllSequentially(
+  api: { approveAndRegister: (op: string, c: Pick<EventCandidate, "id" | "version" | "payload_hash">) => Promise<{ status: "succeeded" | "running" | "failed" }> },
+  flight: SingleFlight,
+  targets: EventCandidate[],
+  onProgress?: (done: number, total: number) => void,
+): Promise<BulkApproveResult[]> {
+  const results: BulkApproveResult[] = [];
+  for (const c of targets) {
+    try {
+      const out = await flight.run(`approve:${c.id}`, (op) => api.approveAndRegister(op, c));
+      results.push({ candidate: c, status: out.status });
+    } catch (error) {
+      results.push({ candidate: c, status: "failed", error });
+    }
+    onProgress?.(results.length, targets.length);
+  }
+  return results;
+}
