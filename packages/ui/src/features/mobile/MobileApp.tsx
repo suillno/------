@@ -266,7 +266,7 @@ function MeetingListScreen(props: {
         {props.meetings.map((m) => {
           const badge = jobBadge(props.jobs.get(m.id), m.revision_id);
           return (
-            <li key={m.id} className="m-meeting-item">
+            <li key={m.id}>
               <button type="button" onClick={() => props.onOpen(m.id)}>
                 <span className="m-list-main">
                   <span className="title">{m.title}</span>
@@ -274,7 +274,6 @@ function MeetingListScreen(props: {
                 </span>
                 <Badge tone={badge.tone}>{badge.label}</Badge>
               </button>
-              <DeleteMeetingButton compact meeting={m} onDeleted={props.onRefresh} />
             </li>
           );
         })}

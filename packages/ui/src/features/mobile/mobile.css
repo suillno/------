@@ -131,43 +131,9 @@
   min-height: 44px;
 }
 
-/* 2026-10-19: 하단 탭 4개, 목록 항목 옆 삭제 버튼 */
+/* 2026-10-19: 하단 탭 4개 */
 .m-tabs {
   grid-template-columns: repeat(4, 1fr);
-}
-
-.m-meeting-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.m-meeting-item > button:first-child {
-  flex: 1;
-  min-width: 0;
-}
-
-/* .m-list button의 width: 100%가 삭제 버튼에도 걸려 제목 버튼이 눌리지 않게 한다 */
-.m-meeting-item > button:not(:first-child) {
-  flex: none;
-  width: auto;
-  min-height: 44px;
-  padding: 0 8px;
-  white-space: nowrap;
-}
-
-/* 삭제 확인창은 항목 아래 줄 전체를 쓴다 */
-.m-meeting-item {
-  flex-wrap: wrap;
-}
-
-.m-meeting-item > div {
-  flex-basis: 100%;
-}
-
-.m-meeting-item .confirm button {
-  width: auto;
-  min-height: 44px;
 }
 
 .m-list .badge {

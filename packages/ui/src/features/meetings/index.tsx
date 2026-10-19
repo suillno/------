@@ -64,13 +64,12 @@ export function MeetingsPage({ focusMeetingId, onFocusHandled }: { focusMeetingI
         <ul className="meeting-list" aria-label="회의록 목록">
           {meetings?.length === 0 && <li className="muted">회의록이 없습니다.</li>}
           {meetings?.map((m) => (
-            <li key={m.id} className="meeting-item">
+            <li key={m.id}>
               <button type="button" aria-current={m.id === selected ? "true" : undefined}
                 onClick={() => { setSelected(m.id); setCreating(false); setMissing(false); }}>
                 <span className="title">{m.title}</span>
                 <span className="muted">{formatInZone(m.meeting_at, m.time_zone)}</span>
               </button>
-              <DeleteMeetingButton compact meeting={m} onDeleted={async () => { if (selected === m.id) setSelected(null); await load(); }} />
             </li>
           ))}
         </ul>

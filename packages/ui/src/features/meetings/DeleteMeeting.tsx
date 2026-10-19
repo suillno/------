@@ -7,10 +7,9 @@ import type { MeetingRow } from "@meeting/contracts";
 import { ConfirmBox, ErrorText, errorMessage } from "../../common";
 import { useApp } from "../../context";
 
-export function DeleteMeetingButton({ meeting, onDeleted, compact }: {
+export function DeleteMeetingButton({ meeting, onDeleted }: {
   meeting: Pick<MeetingRow, "id" | "title" | "version">;
   onDeleted: () => void | Promise<void>;
-  compact?: boolean;
 }) {
   const { api } = useApp();
   const flight = useRef(new SingleFlight()).current;
@@ -47,14 +46,14 @@ export function DeleteMeetingButton({ meeting, onDeleted, compact }: {
 
   if (!confirming) {
     return (
-      <button type="button" className={compact ? "danger-link" : "danger"} onClick={(e) => { e.stopPropagation(); void open(); }}
+      <button type="button" className="danger" onClick={() => void open()}
         aria-label={`${meeting.title} 삭제`}>
         삭제
       </button>
     );
   }
   return (
-    <div onClick={(e) => e.stopPropagation()}>
+    <div>
       <ConfirmBox title="회의록 영구 삭제" confirmLabel="영구 삭제" busy={busy} onConfirm={() => void purge()} onCancel={() => setConfirming(false)}>
         <p><strong>{meeting.title}</strong></p>
         <p>회의록과 분석 결과·요약 편집본·일정 후보가 모두 지워지며 되돌릴 수 없습니다.</p>
