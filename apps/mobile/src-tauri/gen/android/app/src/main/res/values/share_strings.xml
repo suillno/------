@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 공유 메뉴에 보이는 이름. Tauri가 다시 쓰는 strings.xml과 분리해 둔다 -->
+<resources>
+    <string name="share_target_label">회의 어시스턴트</string>
+</resources>
