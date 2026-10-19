@@ -4,7 +4,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type {
   AnalysisJob,
-  AnalysisResultV1,
+  AnalysisResult,
   ApiError,
   CalendarRegisterOutcome,
   CandidatePatch,
@@ -120,7 +120,7 @@ export interface MeetingApi {
   // PC 분석 에이전트(데스크톱)용
   claimAnalysis(deviceId: string, jobId?: string): Promise<ClaimedAnalysis | null>;
   heartbeatAnalysis(jobId: string, leaseToken: string): Promise<void>;
-  submitAnalysisResult(jobId: string, leaseToken: string, sourceRevisionId: string, payload: AnalysisResultV1, metadata: AnalysisMetadata): Promise<{ result_id: string; stale: boolean }>;
+  submitAnalysisResult(jobId: string, leaseToken: string, sourceRevisionId: string, payload: AnalysisResult, metadata: AnalysisMetadata): Promise<{ result_id: string; stale: boolean }>;
   submitAnalysisFailure(jobId: string, leaseToken: string, errorCode: string): Promise<void>;
 }
 

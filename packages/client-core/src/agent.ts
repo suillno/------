@@ -2,7 +2,7 @@
 // 사용자가 누른 '분석 실행'·'재분석'·'재시도'로 서버에 대기 중인 작업만 처리한다.
 // 이 모듈은 새 분석 작업을 만들지 않는다(analysis_request를 호출하지 않는다).
 
-import type { AnalysisResultV1 } from "@meeting/contracts";
+import type { AnalysisResult } from "@meeting/contracts";
 import { ApiRequestError, type AnalysisMetadata, type ClaimedAnalysis, type MeetingApi } from "./api";
 
 /** CLI 실행 결과. 데스크톱이 업로드 전에 로컬 파일로 먼저 저장한 값이다. */
@@ -10,7 +10,7 @@ export interface SavedAnalysis {
   job_id: string;
   lease_token: string;
   source_revision_id: string;
-  payload: AnalysisResultV1;
+  payload: AnalysisResult;
   metadata: AnalysisMetadata;
 }
 

@@ -1,7 +1,7 @@
 // 서버 RPC 응답 형태. 정의: supabase/migrations/20261018090000_analysis_calendar.sql
 // 서버 응답은 신뢰하지 않는 데이터이므로 화면은 문자열을 텍스트로만 렌더링한다.
 
-import type { AnalysisResultV1 } from "./analysis";
+import type { AnalysisResult } from "./analysis";
 import type { AnalysisJobStatus, CalendarJobStatus, EventCandidateStatus } from "./status";
 
 export interface MeetingRow {
@@ -29,6 +29,8 @@ export interface AnalysisJob {
   lease_until: string | null;
   attempt: number;
   error_code: string | null;
+  /** 사용자가 분석 요청 때 입력한 추가 요청사항(없으면 null). 작업 = 분석 이력 단위로 보관 */
+  user_instructions: string | null;
   requested_at: string;
   started_at: string | null;
   finished_at: string | null;
@@ -59,9 +61,27 @@ export interface CandidatePayload {
   evidence: string | null;
   needs_confirmation: boolean;
   description: string | null;
+  /** 목적지명(schema v2). v1 후보에는 없다(= null) */
+  location?: string | null;
+  /** 목적지가 불명확해 승인 전 확인이 필요함 */
+  location_uncertain?: boolean;
 }
 
-export type CandidatePatch = Partial<Pick<CandidatePayload, "title" | "start_local" | "end_local" | "time_zone" | "all_day" | "description">>;
+export type CandidatePatch = Partial<Pick<CandidatePayload, "title" | "start_local" | "end_local" | "time_zone" | "all_day" | "description" | "location">>;
+
+/** ‘요약·결정사항’ 탭 목록 항목 (meeting_summaries RPC) */
+export interface MeetingSummaryItem {
+  meeting_id: string;
+  title: string;
+  meeting_at: string;
+  time_zone: string;
+  result_id: string;
+  summary_preview: string;
+  analyzed_at: string;
+  /** 분석 뒤 회의록이 바뀌어 이전 원문 기준인 결과 */
+  stale: boolean;
+  has_user_notes: boolean;
+}
 
 export interface CalendarJob {
   id: string;
@@ -99,7 +119,7 @@ export interface LatestResult {
   source_revision_id: string;
   stale: boolean;
   created_at: string;
-  payload: AnalysisResultV1;
+  payload: AnalysisResult;
 }
 
 export interface MeetingAnalysisState {

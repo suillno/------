@@ -14,7 +14,7 @@ AI 회의록·캘린더 연동 앱. 설계 기준은 [docs/design.md](docs/desig
 | 목적 | 명령 |
 |---|---|
 | PC 앱 실행 | 바탕화면·시작 메뉴 ‘회의 어시스턴트’ 또는 `npm run start:app` (설치본, 클라우드 연결) |
-| PC 앱 설치본 갱신 | `npm run install:desktop` — release exe 빌드 → `%LOCALAPPDATA%ProgramsMeetingAssistant` 복사 → 바로가기 |
+| PC 앱 설치본 갱신 | `npm run install:desktop` — release exe 빌드 → `%LOCALAPPDATA%\Programs\MeetingAssistant` 복사 → 바로가기 |
 | 개발용 한 번에 실행 | `start-meeting-assistant.cmd` — 로컬 주소면 Docker → Supabase → Edge Function → 데스크톱 개발 앱, 클라우드 주소면 개발 앱만 (`scripts/start-local.ps1`) |
 | 웹 개발 서버 | `npm run dev:web` (5173) |
 | 데스크톱 개발 | `npm run dev:desktop` (Vite 1420 + Tauri) |
