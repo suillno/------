@@ -313,18 +313,14 @@ function AnalysisRequest({ state, refresh }: { state: MeetingAnalysisState; refr
   const flight = useRef(new SingleFlight()).current;
   const [pending, setPending] = useState(false);
   const [confirming, setConfirmingState] = useState<"run" | "rerun" | null>(null);
-  // 요청사항 입력란은 버튼 위에 항상 보인다. 이전 분석이 있으면 그때의 요청사항을 불러와 고칠 수 있다.
-  const [instructions, setInstructions] = useState(() => initialInstructions(state, "rerun"));
+  const [instructions, setInstructions] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const view = analysisView(state, pending);
-  const jobId = state.job?.id;
-  const lastInstructions = state.job?.user_instructions ?? "";
-  useEffect(() => {
-    setInstructions(lastInstructions);
-  }, [jobId, lastInstructions]);
-  const setConfirming = setConfirmingState;
-  const canRequest = view.buttons.some((b) => (b.kind === "run" || b.kind === "rerun") && b.enabled);
+  const setConfirming = (kind: "run" | "rerun" | null) => {
+    if (kind) setInstructions(initialInstructions(state, kind));
+    setConfirmingState(kind);
+  };
 
   async function execute(kind: "run" | "rerun" | "retry") {
     setPending(true);
@@ -358,7 +354,7 @@ function AnalysisRequest({ state, refresh }: { state: MeetingAnalysisState; refr
       {state.job?.status === "running" && <p className="muted">PC에서 분석하고 있습니다.</p>}
       {view.tone === "error" && view.message && <p className="error">{view.message}</p>}
       {state.job?.status === "completed" && <p className="muted">분석이 끝났습니다. 아래 일정을 확인하세요. 요약·결정사항은 ‘요약’ 탭에서 볼 수 있습니다.</p>}
-      {state.job?.user_instructions && !confirming && !canRequest && <p className="muted">요청사항: {state.job.user_instructions}</p>}
+      {state.job?.user_instructions && !confirming && <p className="muted">요청사항: {state.job.user_instructions}</p>}
 
       {confirming ? (
         <ConfirmBox
@@ -369,11 +365,9 @@ function AnalysisRequest({ state, refresh }: { state: MeetingAnalysisState; refr
           onCancel={() => setConfirming(null)}
         >
           <p>이 회의 원문을 PC의 Claude Code로 분석하도록 요청합니다. 원문은 Anthropic 서비스로 전송됩니다. PC 앱이 켜져 있어야 분석이 진행됩니다.</p>
-          <p className="muted">추가 요청사항: {instructions.trim() ? instructions.trim() : "없음 (기존 방식으로 분석)"}</p>
+          <InstructionsField value={instructions} onChange={setInstructions} disabled={pending} />
         </ConfirmBox>
       ) : (
-        <>
-        {canRequest && <InstructionsField value={instructions} onChange={setInstructions} disabled={pending} />}
         <div className="row">
           {view.buttons.filter((b) => b.enabled || !(state.job?.status === "queued" || state.job?.status === "running")).map((b) => (
             <button key={b.kind} type="button" className="primary" disabled={!b.enabled} title={b.reason}
@@ -382,7 +376,6 @@ function AnalysisRequest({ state, refresh }: { state: MeetingAnalysisState; refr
             </button>
           ))}
         </div>
-        </>
       )}
       {notice && <p className="muted" role="status">{notice}</p>}
       <ErrorText>{error}</ErrorText>
