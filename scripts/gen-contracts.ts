@@ -5,12 +5,13 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { analysisResultV1Schema } from "../packages/contracts/src/analysis.ts";
+import { analysisResultV2Schema } from "../packages/contracts/src/analysis.ts";
 
-export const CLI_SCHEMA_PATH = "apps/desktop/src-tauri/generated/analysis-result-v1.cli-schema.json";
+// 새 분석은 schema v2(일정 후보 목적지 포함)로 만든다. v1 결과는 서버·화면이 계속 읽는다.
+export const CLI_SCHEMA_PATH = "apps/desktop/src-tauri/generated/analysis-result-v2.cli-schema.json";
 
 export function cliSchemaJson(): string {
-  const { $schema: _schema, $id: _id, ...rest } = analysisResultV1Schema;
+  const { $schema: _schema, $id: _id, ...rest } = analysisResultV2Schema;
   return `${JSON.stringify(rest)}\n`;
 }
 

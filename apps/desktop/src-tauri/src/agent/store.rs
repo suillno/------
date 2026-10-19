@@ -7,7 +7,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use crate::agent::validate::AnalysisResultV1;
+use crate::agent::validate::AnalysisResult;
 use crate::paths::{PathError, PathResolver};
 
 const UPLOAD_FILE: &str = "upload.json";
@@ -25,7 +25,7 @@ pub struct SavedAnalysis {
     pub job_id: String,
     pub lease_token: String,
     pub source_revision_id: String,
-    pub payload: AnalysisResultV1,
+    pub payload: AnalysisResult,
     pub metadata: AnalysisMetadata,
 }
 
@@ -75,7 +75,7 @@ pub fn clear(paths: &PathResolver, user_id: &str, job_id: &str) -> Result<(), Pa
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agent::validate::AnalysisResultV1;
+    use crate::agent::validate::AnalysisResult;
 
     const USER: &str = "3f2b8c1e-9d4a-4b7e-8f1a-2c3d4e5f6a7b";
     const JOB: &str = "00000000-0000-4000-8000-000000000001";
@@ -85,7 +85,7 @@ mod tests {
             job_id: JOB.into(),
             lease_token: "lease".into(),
             source_revision_id: "rev".into(),
-            payload: AnalysisResultV1 { schema_version: 1, summary: "요약".into(), decisions: vec![], action_items: vec![], event_candidates: vec![] },
+            payload: AnalysisResult { schema_version: 2, summary: "요약".into(), decisions: vec![], action_items: vec![], event_candidates: vec![] },
             metadata: AnalysisMetadata { engine_version: "e".into(), prompt_version: "p".into(), input_hash: "h".into() },
         }
     }

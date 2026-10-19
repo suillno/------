@@ -29,6 +29,8 @@ pub mod limits {
     pub const PROBE_TIMEOUT: Duration = Duration::from_secs(30);
     /// 서버 meetings.body 상한과 같다
     pub const MAX_BODY_BYTES: usize = 1_000_000;
+    /// 서버 analysis_jobs.user_instructions 상한과 같다
+    pub const MAX_INSTRUCTIONS_CHARS: usize = 2000;
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -43,6 +45,9 @@ pub struct ClaimedInput {
     pub body: String,
     pub meeting_local_date: String,
     pub time_zone: String,
+    /// 사용자가 분석 요청 때 입력한 추가 요청사항(없으면 None). 원문(body)과 섞지 않는다
+    #[serde(default)]
+    pub user_instructions: Option<String>,
 }
 
 /// analysis_claim 응답 중 실행에 필요한 부분
@@ -72,6 +77,8 @@ struct StdinDocument<'a> {
     meeting_local_date: &'a str,
     time_zone: &'a str,
     body: &'a str,
+    /// 원문과 분리한 별도 필드. 없으면 null. 지시문 v2가 요약·결정사항의 초점에만 반영하도록 한다
+    user_instructions: Option<&'a str>,
 }
 
 fn sha256_hex(text: &str) -> String {
@@ -91,7 +98,11 @@ fn probe(exec: &dyn CliExecutor, arg: &str, cwd: &Path) -> Result<String, Failur
 /// 작업 하나를 실행하고 결과를 로컬에 저장한다. 경로 오류만 Err이고 CLI·검증 실패는 Ok(Failed)다.
 pub fn run_job(exec: &dyn CliExecutor, paths: &PathResolver, user_id: &str, claimed: &Claimed) -> Result<RunOutcome, PathError> {
     let input = &claimed.input;
-    if input.body.len() > limits::MAX_BODY_BYTES || input.title.chars().count() > 300 {
+    let instructions = input.user_instructions.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    if input.body.len() > limits::MAX_BODY_BYTES
+        || input.title.chars().count() > 300
+        || instructions.is_some_and(|s| s.chars().count() > limits::MAX_INSTRUCTIONS_CHARS)
+    {
         return Ok(RunOutcome::failed(FailureCode::InvalidOutput));
     }
     let dir = paths.ensure_dir(&paths.analysis_job_dir(user_id, &claimed.job.id)?)?;
@@ -110,6 +121,7 @@ pub fn run_job(exec: &dyn CliExecutor, paths: &PathResolver, user_id: &str, clai
         meeting_local_date: &input.meeting_local_date,
         time_zone: &input.time_zone,
         body: &input.body,
+        user_instructions: instructions,
     })
     .expect("문자열만 있는 구조체 직렬화");
 
@@ -185,14 +197,15 @@ mod tests {
                 body: BODY.into(),
                 meeting_local_date: "2026-10-16".into(),
                 time_zone: "Asia/Seoul".into(),
+                user_instructions: Some("결정사항을 짧게 정리해 줘".into()),
             },
         }
     }
 
     const OK: &str = r#"{"type":"result","subtype":"success","is_error":false,"permission_denials":[],
-      "structured_output":{"schema_version":1,"summary":"요약","decisions":[],"action_items":[],
+      "structured_output":{"schema_version":2,"summary":"요약","decisions":[],"action_items":[],
       "event_candidates":[{"title":"리뷰","start_local":"2026-10-20T15:00","end_local":null,"time_zone":"Asia/Seoul",
-      "all_day":false,"evidence":"다음 주 화요일 3시","needs_confirmation":false}]}}"#;
+      "all_day":false,"evidence":"다음 주 화요일 3시","needs_confirmation":false,"location":null,"location_uncertain":false}]}}"#;
 
     #[test]
     fn 원문은_stdin으로만_넘기고_결과를_저장한다() {
@@ -202,13 +215,18 @@ mod tests {
         let outcome = run_job(&cli, &paths, USER, &claimed()).unwrap();
         let RunOutcome::Saved { saved, .. } = outcome else { panic!("{outcome:?}") };
         assert!(saved.payload.event_candidates[0].needs_confirmation, "종료 시각이 없으면 확인 필요");
-        assert_eq!(saved.metadata.prompt_version, "meeting-analysis/v1");
+        assert_eq!(saved.metadata.prompt_version, "meeting-analysis/v2");
         assert_eq!(saved.metadata.engine_version, "2.1.291 (Claude Code)");
 
         let calls = cli.calls.lock().unwrap();
         let (args, stdin) = calls.last().unwrap();
         assert!(!args.iter().any(|a| a.contains("김철수") || a.contains("del /q")), "원문이 인자에 들어가면 안 된다");
         assert!(stdin.contains("del /q"), "원문은 stdin 데이터로 간다");
+        // I02 요청사항은 원문과 분리된 별도 필드로 stdin에만 들어간다
+        let doc: serde_json::Value = serde_json::from_str(stdin).unwrap();
+        assert_eq!(doc["user_instructions"], "결정사항을 짧게 정리해 줘");
+        assert!(!doc["body"].as_str().unwrap().contains("결정사항을 짧게"));
+        assert!(!args.iter().any(|a| a.contains("결정사항을 짧게")), "요청사항도 인자에 들어가면 안 된다");
         assert_eq!(store::pending(&paths, USER).unwrap().len(), 1, "업로드 전에 로컬 저장");
     }
 
@@ -226,8 +244,8 @@ mod tests {
     fn a04_검증에_실패한_결과는_저장하지_않는다() {
         let tmp = tempfile::tempdir().unwrap();
         let paths = PathResolver::with_root(tmp.path().to_path_buf());
-        let bad = r#"{"subtype":"success","is_error":false,"structured_output":{"schema_version":1,"summary":"s","decisions":[],"action_items":[],
-          "event_candidates":[{"title":"x","start_local":"2026-13-01T10:00","end_local":null,"time_zone":"Asia/Seoul","all_day":false,"evidence":"","needs_confirmation":true}]}}"#;
+        let bad = r#"{"subtype":"success","is_error":false,"structured_output":{"schema_version":2,"summary":"s","decisions":[],"action_items":[],
+          "event_candidates":[{"title":"x","start_local":"2026-13-01T10:00","end_local":null,"time_zone":"Asia/Seoul","all_day":false,"evidence":"","needs_confirmation":true,"location":null,"location_uncertain":false}]}}"#;
         assert_eq!(run_job(&fake(bad), &paths, USER, &claimed()).unwrap(), RunOutcome::failed(FailureCode::InvalidOutput));
         assert!(store::pending(&paths, USER).unwrap().is_empty());
     }

@@ -34,7 +34,7 @@
 | `supabase/functions/.env` | 로컬 Edge Function 비밀 (Git 제외) | 로컬 전용 |
 | `supabase/tests/` | RLS·트랜잭션 통합 테스트 (pgTAP). `sync_commit_order`는 dblink를 쓰는 로컬 전용 | ✅ 130건 |
 | `storage/sqlite/migrations/` | PC 캐시 전용 마이그레이션 | ⬜ |
-| `prompts/meeting-analysis/v1/` | 분석 지시문 (`prompt.md`는 Rust가 컴파일 시 포함) | ✅ |
+| `prompts/meeting-analysis/v2/` | 분석 지시문 v2(요청사항·목적지). Rust가 컴파일 시 포함. v1은 이력 보관 | ✅ |
 | `tests/integration/` | 로컬 Supabase + Edge Function 통합 테스트 (`npm run test:integration`) | ✅ 2건 |
 | `tests/e2e`, `tests/fixtures` | E2E·고정 자료 | ⬜ |
 | `scripts/` | 계약 생성(`gen-contracts.ts`), 통합 테스트 실행기, 실행기(`start-local.ps1`, 로컬/클라우드 모드 자동 판별), 설치본 갱신(`install-desktop.ps1`), 설치본 실행(`start-app.mjs`), APK 빌드(`build-android.mjs`). `.ps1`은 UTF-8 BOM 유지 | ✅ |

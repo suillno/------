@@ -13,10 +13,10 @@ use std::time::{Duration, Instant};
 
 use serde_json::Value;
 
-pub const PROMPT: &str = include_str!("../../../../../prompts/meeting-analysis/v1/prompt.md");
-pub const PROMPT_VERSION: &str = "meeting-analysis/v1";
+pub const PROMPT: &str = include_str!("../../../../../prompts/meeting-analysis/v2/prompt.md");
+pub const PROMPT_VERSION: &str = "meeting-analysis/v2";
 /// `npm run gen:contracts`로 packages/contracts에서 생성한다. 직접 수정하지 않는다.
-pub const CLI_SCHEMA: &str = include_str!("../../generated/analysis-result-v1.cli-schema.json");
+pub const CLI_SCHEMA: &str = include_str!("../../generated/analysis-result-v2.cli-schema.json");
 
 /// 안전 실행에 필요한 플래그. `claude --help`에 하나라도 없으면 자동 실행하지 않는다(CLI_UNSUPPORTED).
 pub const REQUIRED_FLAGS: [&str; 8] = [

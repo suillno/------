@@ -22,11 +22,16 @@ pub struct EventCandidate {
     pub all_day: bool,
     pub evidence: String,
     pub needs_confirmation: bool,
+    /// 원문에 실제 목적지가 있을 때만 그 이름(schema v2). 직렬화하면 항상 키가 있다(null 포함)
+    pub location: Option<String>,
+    /// 목적지가 불명확·여러 곳이면 true → 사용자가 승인 전에 확인
+    pub location_uncertain: bool,
 }
 
+/// 새 분석 결과(schema v2). 서버는 v1 결과도 읽지만 이 에이전트는 v2만 만든다.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
-pub struct AnalysisResultV1 {
+pub struct AnalysisResult {
     pub schema_version: u32,
     pub summary: String,
     pub decisions: Vec<String>,
@@ -102,10 +107,17 @@ fn looks_like_time_zone(tz: &str) -> bool {
         && tz.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '_' | '+' | '-'))
 }
 
-/// 검증하고 일부 값을 정규화한다. 날짜·시각이 비면 needs_confirmation을 true로 바꾼다.
-pub fn validate(value: &Value) -> Result<AnalysisResultV1, Invalid> {
-    let mut r: AnalysisResultV1 = serde_json::from_value(value.clone()).map_err(|e| Invalid(e.to_string()))?;
-    if r.schema_version != 1 {
+/// 검증하고 일부 값을 정규화한다. 날짜·시각이 비면 needs_confirmation을 true로 바꾸고,
+/// 목적지는 앞뒤 공백을 지우며 빈 문자열은 목적지 없음(null)으로 바꾼다.
+pub fn validate(value: &Value) -> Result<AnalysisResult, Invalid> {
+    if let Some(items) = value.get("event_candidates").and_then(Value::as_array) {
+        // serde의 Option은 키가 없어도 None이 되므로, v2에 필요한 두 키가 실제로 있는지 따로 확인한다.
+        if items.iter().any(|c| c.get("location").is_none() || c.get("location_uncertain").is_none()) {
+            return Err(Invalid("event_candidates[] location·location_uncertain 누락".into()));
+        }
+    }
+    let mut r: AnalysisResult = serde_json::from_value(value.clone()).map_err(|e| Invalid(e.to_string()))?;
+    if r.schema_version != 2 {
         return Err(Invalid("schema_version".into()));
     }
     check_len("summary", &r.summary, 0, 4000)?;
@@ -146,6 +158,10 @@ pub fn validate(value: &Value) -> Result<AnalysisResultV1, Invalid> {
         if c.start_local.is_none() || c.end_local.is_none() {
             c.needs_confirmation = true;
         }
+        c.location = c.location.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(str::to_string);
+        if let Some(place) = &c.location {
+            check_len("event_candidates[].location", place, 1, 200)?;
+        }
     }
     Ok(r)
 }
@@ -157,10 +173,11 @@ mod tests {
 
     fn base() -> Value {
         json!({
-            "schema_version": 1, "summary": "요약", "decisions": ["결정"],
+            "schema_version": 2, "summary": "요약", "decisions": ["결정"],
             "action_items": [{"text": "자료 공유", "assignee": "이영희", "due_date": "2026-10-23"}],
             "event_candidates": [{"title": "리뷰", "start_local": "2026-10-20T15:00", "end_local": "2026-10-20T16:00",
-              "time_zone": "Asia/Seoul", "all_day": false, "evidence": "화요일 3시", "needs_confirmation": false}]
+              "time_zone": "Asia/Seoul", "all_day": false, "evidence": "화요일 3시", "needs_confirmation": false,
+              "location": "교대역", "location_uncertain": false}]
         })
     }
 
@@ -194,8 +211,8 @@ mod tests {
         v["extra"] = json!(1);
         assert!(validate(&v).is_err());
         let mut v = base();
-        v["schema_version"] = json!(2);
-        assert!(validate(&v).is_err());
+        v["schema_version"] = json!(1);
+        assert!(validate(&v).is_err(), "에이전트는 v2만 만든다");
     }
 
     #[test]
@@ -206,10 +223,27 @@ mod tests {
     }
 
     #[test]
+    fn 목적지는_원문에_있을_때만_두고_빈_값은_없음으로_바꾼다() {
+        assert_eq!(validate(&base()).unwrap().event_candidates[0].location.as_deref(), Some("교대역"));
+        let mut v = base();
+        v["event_candidates"][0]["location"] = json!("   ");
+        assert_eq!(validate(&v).unwrap().event_candidates[0].location, None);
+        let mut v = base();
+        v["event_candidates"][0]["location"] = json!("가".repeat(201));
+        assert!(validate(&v).is_err(), "200자 초과");
+        let mut v = base();
+        v["event_candidates"][0].as_object_mut().unwrap().remove("location");
+        assert!(validate(&v).is_err(), "v2에서 location 키 누락");
+        let out = serde_json::to_value(validate(&base()).unwrap()).unwrap();
+        assert!(out["event_candidates"][0].get("location_uncertain").is_some(), "업로드 payload에 항상 키가 있다");
+    }
+
+    #[test]
     fn 윤년과_시간대_이름을_확인한다() {
         let mut v = base();
         v["event_candidates"][0] = json!({"title": "종일", "start_local": "2028-02-29", "end_local": "2028-02-29",
-            "time_zone": "America/New_York", "all_day": true, "evidence": "", "needs_confirmation": false});
+            "time_zone": "America/New_York", "all_day": true, "evidence": "", "needs_confirmation": false,
+            "location": null, "location_uncertain": false});
         assert!(validate(&v).is_ok());
         v["event_candidates"][0]["time_zone"] = json!("; rm -rf");
         assert!(validate(&v).is_err());
