@@ -6,7 +6,7 @@
 
 ## 구현 현황
 
-Supabase RPC(`POST /rest/v1/rpc/<이름>`, 사용자 JWT 필요)와 Edge Function(`POST /functions/v1/<이름>`)이다. 정의: [`20261017090000_sync_foundation.sql`](../supabase/migrations/20261017090000_sync_foundation.sql), [`20261018090000_analysis_calendar.sql`](../supabase/migrations/20261018090000_analysis_calendar.sql), [`supabase/functions/_shared/handlers.ts`](../supabase/functions/_shared/handlers.ts). 클라이언트 구현: `packages/client-core/src/api.ts`.
+Supabase RPC(`POST /rest/v1/rpc/<이름>`, 사용자 JWT 필요)와 Edge Function(`POST /functions/v1/<이름>`)이다. 정의: [`20261017090000_sync_foundation.sql`](../supabase/migrations/20261017090000_sync_foundation.sql), [`20261018090000_analysis_calendar.sql`](../supabase/migrations/20261018090000_analysis_calendar.sql), [`20261019090000_meeting_features.sql`](../supabase/migrations/20261019090000_meeting_features.sql), [`supabase/functions/_shared/handlers.ts`](../supabase/functions/_shared/handlers.ts). 클라이언트 구현: `packages/client-core/src/api.ts`.
 
 | 논리 엔드포인트 | RPC | 상태 |
 |---|---|---|
@@ -31,6 +31,11 @@ Supabase RPC(`POST /rest/v1/rpc/<이름>`, 사용자 JWT 필요)와 Edge Functio
 | GET /v1/google/callback | Edge Function `google-oauth-callback` (JWT 검사 없음, 일회용 state) | ✅ vitest·통합 |
 | DELETE /v1/google/connection | Edge Function `google-disconnect` | ✅ vitest |
 | Google 연결 상태 | `google_connection_status()` (토큰 없음) | ✅ pgTAP |
+| 회의록 영구 삭제 | `meeting_purge(p_operation_id, p_id, p_base_version)` → { id, purged, registered_events_kept }. 캘린더 등록 실행 중이면 409 JOB_IN_PROGRESS. 분석·후보·편집본은 함께 지우고 Google 일정은 남긴다 | ✅ pgTAP·통합 |
+| 분석 추가 요청사항 | `analysis_request(…, p_mode, p_user_instructions?)` — 2000자 이하, 앞뒤 공백 정리, 작업(`analysis_jobs.user_instructions`)에 보관. `analysis_claim`의 input에 원문과 따로 전달 | ✅ pgTAP·통합 |
+| 요약 목록 | `meeting_summaries()` → 회의별 최신 결과 1건(제목·일시·미리보기 160자·분석 시각·stale·편집본 여부). 결과 없는 회의 제외 | ✅ pgTAP·통합 |
+| 후보 목적지 수정 | `candidate_patch`의 `location` 키 — 빈 값은 삭제, 수정하면 `location_uncertain=false`. 불명확한 목적지는 승인 거절 | ✅ pgTAP |
+| 원본 회의록 링크 | Edge Function `open-meeting?m=<UUID>` (GET, JWT 검사 없음, DB 조회 없음) → 안드로이드 intent / PC `meetingassistant://meeting/<UUID>` 302. [ADR 0004](adr/0004-meeting-deep-link.md) | ✅ vitest·로컬 확인 |
 
 서버 전용(`service_role`만 실행): `svc_oauth_state_create`, `svc_oauth_state_consume`, `svc_oauth_connection_save/get/set_status`, `svc_calendar_job_claim/complete/fail`. 사용자 JWT로 호출하면 42501로 거절된다(pgTAP R02).
 
