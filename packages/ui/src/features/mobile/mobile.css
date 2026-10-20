@@ -140,3 +140,23 @@
   flex: none;
   white-space: nowrap;
 }
+
+/* 2026-10-20: 서식 편집기 — 휴대폰은 누르는 영역 44px, 도구 모음은 화면 상단 머리글 아래에 붙는다 */
+.m-shell .rt-tool,
+.m-shell .rt-chip {
+  min-width: 44px;
+  height: 44px;
+}
+
+.m-shell {
+  /* 머리글(sticky) 높이: 위 여백 10 + 글줄 약 41 + 아래 여백 10 + 안전 영역 */
+  --m-header-height: calc(env(safe-area-inset-top, 0px) + 61px);
+}
+
+.m-shell .rt-toolbar {
+  top: var(--m-header-height);
+}
+
+.m-shell .rt-palette {
+  grid-template-columns: repeat(5, 44px);
+}

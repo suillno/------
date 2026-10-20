@@ -17,11 +17,12 @@ import {
 import type { MeetingAnalysisState, MeetingRow } from "@meeting/contracts";
 import { Badge, ConfirmBox, ErrorText, errorMessage } from "../../common";
 import { AppContext, useApp, useGoogleConnection, useMeetingAnalysis, useSession, type AppContextValue } from "../../context";
-import { MarkdownBody } from "../../markdown";
+import { confirmLeave, hasUnsavedChanges, useBackGuard } from "../../unsaved";
 import { SHARE_EVENT, draftFromShare, type DeviceSettings, type Platform } from "../../platform";
 import { LoginForm } from "../auth/LoginForm";
 import { CandidateList } from "../calendar/CandidateList";
 import { MissingMeeting, NewMeetingForm, type MeetingDraft } from "../meetings";
+import { MeetingBody } from "../meetings/MeetingBody";
 import { DeleteMeetingButton } from "../meetings/DeleteMeeting";
 import { InstructionsField, initialInstructions, instructionsIgnored } from "../meetings/Instructions";
 import { SummariesView } from "../notes";
@@ -122,6 +123,11 @@ function MobileShell({ api, platform, session }: { api: MeetingApi; platform: Pl
       if (r.notice) setNotice(r.notice);
       if (!r.added) return;
       setDraft(readDraft(platform.deviceSettings));
+      // 다른 편집을 저장하지 않았으면 화면을 바꾸지 않고 알린다(편집 내용을 버리지 않음)
+      if (hasUnsavedChanges()) {
+        setNotice("공유한 내용을 새 회의 초안에 넣었습니다. 지금 편집을 저장한 뒤 ‘회의 등록’에서 확인하세요.");
+        return;
+      }
       setDraftKey((k) => k + 1);
       setScreen({ name: "new" });
     });
@@ -137,7 +143,7 @@ function MobileShell({ api, platform, session }: { api: MeetingApi; platform: Pl
     if (pendingLink) setScreen({ name: "meeting", id: pendingLink });
     return inbox.subscribe(() => {
       const id = inbox.take();
-      if (id) setScreen({ name: "meeting", id });
+      if (id && confirmLeave()) setScreen({ name: "meeting", id });
     });
   }, [platform]);
 
@@ -167,14 +173,24 @@ function MobileShell({ api, platform, session }: { api: MeetingApi; platform: Pl
     [api, platform, session, google, refreshGoogle],
   );
 
-  const open = (s: Screen) => {
+  // 화면 이동 전에 저장 안 한 편집을 확인한다
+  const go = (s: Screen) => {
     setScreen(s);
     window.scrollTo(0, 0);
   };
+  const open = (s: Screen) => {
+    if (confirmLeave()) go(s);
+  };
   const back = () => {
-    open({ name: "list" });
+    if (!confirmLeave()) return;
+    go({ name: "list" });
     void reload();
   };
+  // 안드로이드 뒤로가기: 편집 중이면 확인 후 목록으로
+  useBackGuard(() => {
+    go({ name: "list" });
+    void reload();
+  });
   const meeting = screen.name === "meeting" ? meetings?.find((m) => m.id === screen.id) ?? null : null;
   const reviewCount = pending.filter((c) => c.status === "needs_review" || c.status === "failed").length;
 
@@ -207,17 +223,18 @@ function MobileShell({ api, platform, session }: { api: MeetingApi; platform: Pl
               onDraftChange={(d) => writeDraft(platform.deviceSettings, d)}
               onCancel={() => {
                 clearDraft();
-                back();
+                go({ name: "list" });
+                void reload();
               }}
               onCreated={async (m) => {
                 clearDraft();
                 await reload();
-                open({ name: "meeting", id: m.id });
+                go({ name: "meeting", id: m.id });
               }}
             />
           )}
           {screen.name === "meeting" && meeting && (
-            <MeetingScreen key={meeting.id} meeting={meeting} onChanged={reload} onDeleted={back} />
+            <MeetingScreen key={meeting.id} meeting={meeting} onChanged={reload} onDeleted={() => { go({ name: "list" }); void reload(); }} />
           )}
           {screen.name === "meeting" && !meeting && meetings && <MissingMeeting />}
           {screen.name === "meeting" && !meetings && <p className="muted">불러오는 중…</p>}
@@ -264,7 +281,7 @@ function MeetingListScreen(props: {
       {props.meetings.length === 0 && <p className="muted">등록한 회의가 없습니다. 아래 ‘회의 등록’을 누르세요.</p>}
       <ul className="m-list">
         {props.meetings.map((m) => {
-          const badge = jobBadge(props.jobs.get(m.id), m.revision_id);
+          const badge = jobBadge(props.jobs.get(m.id), m.analysis_revision_id ?? m.revision_id);
           return (
             <li key={m.id}>
               <button type="button" onClick={() => props.onOpen(m.id)}>
@@ -295,7 +312,7 @@ function MeetingScreen({ meeting, onChanged, onDeleted }: { meeting: MeetingRow;
           <DeleteMeetingButton meeting={meeting} onDeleted={onDeleted} />
         </div>
         <p className="muted">{formatInZone(meeting.meeting_at, meeting.time_zone)} ({meeting.time_zone})</p>
-        <MarkdownBody source={meeting.body} />
+        <MeetingBody meeting={meeting} onSaved={async () => { await onChanged(); await refresh(); }} />
       </article>
       <ErrorText>{error}</ErrorText>
       {state && <AnalysisRequest state={state} refresh={async () => { await refresh(); await onChanged(); }} />}
@@ -330,7 +347,7 @@ function AnalysisRequest({ state, refresh }: { state: MeetingAnalysisState; refr
       const job = await flight.run(`analysis:${state.meeting.id}`, (op) =>
         kind === "retry" && state.job
           ? api.retryAnalysis(op, state.job.id)
-          : api.requestAnalysis(op, state.meeting.id, state.meeting.revision_id, kind === "rerun" ? "rerun" : "initial", instructions));
+          : api.requestAnalysis(op, state.meeting.id, state.meeting.analysis_revision_id ?? state.meeting.revision_id, kind === "rerun" ? "rerun" : "initial", instructions));
       if (kind !== "retry" && instructionsIgnored(job, instructions)) {
         setNotice("이미 요청된 분석이 있어 새 요청사항은 적용되지 않았습니다.");
       }

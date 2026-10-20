@@ -9,6 +9,7 @@ import { NotesPage, notesFeature } from "./features/notes";
 import { SettingsPage, settingsFeature } from "./features/settings";
 import { TasksPage, tasksFeature } from "./features/tasks";
 import { SETTING_DEVICE_ID, SETTING_PC_ANALYSIS, type Platform, type PlatformStatus } from "./platform";
+import { confirmLeave } from "./unsaved";
 import "./styles.css";
 
 const FEATURES = [meetingsFeature, notesFeature, tasksFeature, calendarFeature, settingsFeature] as const;
@@ -164,7 +165,7 @@ function MainShell({ api, platform, session }: { api: MeetingApi; platform: Plat
     <AppContext.Provider value={ctx}>
       <nav className="shell-nav">
         {FEATURES.map((f) => (
-          <button key={f.id} type="button" aria-current={f.id === active ? "page" : undefined} onClick={() => setActive(f.id)}>
+          <button key={f.id} type="button" aria-current={f.id === active ? "page" : undefined} onClick={() => f.id !== active && confirmLeave() && setActive(f.id)}>
             {f.title}
           </button>
         ))}

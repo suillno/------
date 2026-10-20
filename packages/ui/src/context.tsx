@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import type { MeetingApi, Session } from "@meeting/client-core";
+import { ApiRequestError, type MeetingApi, type Session } from "@meeting/client-core";
 import type { GoogleConnectionStatus, MeetingAnalysisState } from "@meeting/contracts";
 import { errorMessage } from "./common";
 import type { Platform } from "./platform";
@@ -67,6 +67,8 @@ function isBusy(s: MeetingAnalysisState | null): boolean {
 export function useMeetingAnalysis(api: MeetingApi, meetingId: string) {
   const [state, setState] = useState<MeetingAnalysisState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 삭제됐거나 다른 계정의 회의(404)
+  const [missing, setMissing] = useState(false);
   const current = useRef(meetingId);
   current.current = meetingId;
 
@@ -76,9 +78,13 @@ export function useMeetingAnalysis(api: MeetingApi, meetingId: string) {
       if (current.current === meetingId) {
         setState(next);
         setError(null);
+        setMissing(false);
       }
     } catch (e) {
-      if (current.current === meetingId) setError(errorMessage(e));
+      if (current.current === meetingId) {
+        setError(errorMessage(e));
+        setMissing(e instanceof ApiRequestError && e.code === "NOT_FOUND");
+      }
     }
   }, [api, meetingId]);
 
@@ -100,5 +106,5 @@ export function useMeetingAnalysis(api: MeetingApi, meetingId: string) {
     return () => clearInterval(t);
   }, [busy, refresh]);
 
-  return { state, error, refresh };
+  return { state, error, missing, refresh };
 }

@@ -5,10 +5,12 @@ import { SingleFlight, formatInZone, isValidTimeZone, localToInstant } from "@me
 import type { MeetingRow } from "@meeting/contracts";
 import { ErrorText, errorMessage } from "../../common";
 import { useApp, useMeetingAnalysis } from "../../context";
-import { MarkdownBody, MarkdownEditor } from "../../markdown";
+import { RichEditor, type RichEditorHandle } from "../../rich/RichEditor";
+import { confirmLeave, useUnsavedChanges } from "../../unsaved";
 import { CandidateList } from "../calendar/CandidateList";
 import { AnalysisPanel } from "./AnalysisPanel";
 import { DeleteMeetingButton } from "./DeleteMeeting";
+import { MeetingBody } from "./MeetingBody";
 
 export const meetingsFeature = {
   id: "meetings",
@@ -55,7 +57,7 @@ export function MeetingsPage({ focusMeetingId, onFocusHandled }: { focusMeetingI
         <h2>회의록</h2>
         <div className="row">
           <button type="button" onClick={() => void load()}>새로고침</button>
-          <button type="button" className="primary" onClick={() => { setCreating(true); setSelected(null); }}>새 회의록</button>
+          <button type="button" className="primary" onClick={() => { if (confirmLeave()) { setCreating(true); setSelected(null); } }}>새 회의록</button>
         </div>
       </div>
       <ErrorText>{error}</ErrorText>
@@ -66,7 +68,7 @@ export function MeetingsPage({ focusMeetingId, onFocusHandled }: { focusMeetingI
           {meetings?.map((m) => (
             <li key={m.id}>
               <button type="button" aria-current={m.id === selected ? "true" : undefined}
-                onClick={() => { setSelected(m.id); setCreating(false); setMissing(false); }}>
+                onClick={() => { if (m.id !== selected && confirmLeave()) { setSelected(m.id); setCreating(false); setMissing(false); } }}>
                 <span className="title">{m.title}</span>
                 <span className="muted">{formatInZone(m.meeting_at, m.time_zone)}</span>
               </button>
@@ -87,7 +89,7 @@ export function MeetingsPage({ focusMeetingId, onFocusHandled }: { focusMeetingI
           )}
           {missing && !creating && !current && <MissingMeeting />}
           {current && (
-            <MeetingDetail key={current.id} meeting={current} onDeleted={async () => { setSelected(null); await load(); }} />
+            <MeetingDetail key={current.id} meeting={current} onChanged={load} onDeleted={async () => { setSelected(null); await load(); }} />
           )}
           {!creating && !current && !missing && <p className="muted">회의록을 고르거나 새로 작성하세요.</p>}
         </div>
@@ -143,8 +145,11 @@ export function NewMeetingForm({ onCancel, onCreated, initial, onDraftChange }: 
   const [at, setAt] = useState(nowLocal);
   const [tz, setTz] = useState(defaultTimeZone);
   const [body, setBodyState] = useState(initial?.body ?? "");
+  const bodyRef = useRef<RichEditorHandle>(null);
   const setTitle = (v: string) => { setTitleState(v); onDraftChange?.({ ...initial, title: v, body }); };
   const setBody = (v: string) => { setBodyState(v); onDraftChange?.({ ...initial, title, body: v }); };
+  const [dirty, setDirty] = useState(false);
+  useUnsavedChanges(dirty || title !== (initial?.title ?? ""));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -155,7 +160,10 @@ export function NewMeetingForm({ onCancel, onCreated, initial, onDraftChange }: 
     setBusy(true);
     setError(null);
     try {
-      const created = await flight.run("create", (op) => api.createMeeting(op, { title: title.trim(), body, meeting_at: instant, time_zone: tz }));
+      const text = bodyRef.current?.getMarkdown() ?? body;
+      const created = await flight.run("create", (op) => api.createMeeting(op, { title: title.trim(), body: text, meeting_at: instant, time_zone: tz }));
+      setDirty(false);
+      setTitleState(initial?.title ?? "");
       await onCreated(created);
     } catch (e) {
       setError(errorMessage(e));
@@ -183,11 +191,11 @@ export function NewMeetingForm({ onCancel, onCreated, initial, onDraftChange }: 
             <input value={tz} onChange={(e) => setTz(e.target.value)} />
           </label>
         </div>
-        <MarkdownEditor label="본문 (Markdown 지원)" value={body} onChange={setBody} rows={12} />
+        <RichEditor ref={bodyRef} label="본문" initial={initial?.body ?? ""} disabled={busy} onDirtyChange={setDirty} onValue={setBody} minHeight={200} />
         <p className="muted">저장해도 분석은 시작되지 않습니다. 저장 후 ‘분석 실행’을 눌러야 분석합니다.</p>
         <div className="row">
           <button type="submit" className="primary" disabled={!title.trim()}>{busy ? "저장 중…" : "저장"}</button>
-          <button type="button" onClick={onCancel}>취소</button>
+          <button type="button" onClick={() => { if (confirmLeave()) { setDirty(false); setTitleState(initial?.title ?? ""); onCancel(); } }}>취소</button>
         </div>
       </fieldset>
       <ErrorText>{error}</ErrorText>
@@ -195,7 +203,7 @@ export function NewMeetingForm({ onCancel, onCreated, initial, onDraftChange }: 
   );
 }
 
-function MeetingDetail({ meeting, onDeleted }: { meeting: MeetingRow; onDeleted: () => Promise<void> }) {
+function MeetingDetail({ meeting, onChanged, onDeleted }: { meeting: MeetingRow; onChanged: () => Promise<void>; onDeleted: () => Promise<void> }) {
   const { api } = useApp();
   const { state, error, refresh } = useMeetingAnalysis(api, meeting.id);
   return (
@@ -206,7 +214,7 @@ function MeetingDetail({ meeting, onDeleted }: { meeting: MeetingRow; onDeleted:
           <DeleteMeetingButton meeting={meeting} onDeleted={onDeleted} />
         </div>
         <p className="muted">{formatInZone(meeting.meeting_at, meeting.time_zone)} ({meeting.time_zone})</p>
-        <MarkdownBody source={meeting.body} />
+        <MeetingBody meeting={meeting} onSaved={async () => { await onChanged(); await refresh(); }} />
       </article>
       <ErrorText>{error}</ErrorText>
       {state && state.meeting.revision_id !== meeting.revision_id && (

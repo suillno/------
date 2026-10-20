@@ -173,21 +173,66 @@ fieldset { margin: 0; padding: 0; border: 0; }
 /* 2026-10-19: 영구 삭제, Markdown 편집/미리보기, 요약 목록 */
 button.danger { border-color: var(--err); color: var(--err); }
 
-.md-editor { margin: 8px 0; }
 .md-label { font-size: 0.875rem; }
-.md-tabs { display: inline-flex; gap: 0; }
-.md-tabs button { border-radius: 0; padding: 4px 10px; font-size: 0.8125rem; }
-.md-tabs button:first-child { border-radius: 6px 0 0 6px; }
-.md-tabs button:last-child { border-radius: 0 6px 6px 0; }
-.md-tabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
-.md-preview { min-height: 8rem; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; }
-.markdown { overflow-wrap: anywhere; line-height: 1.55; }
-.markdown h1, .markdown h2, .markdown h3 { font-size: 1.05rem; margin: 10px 0 6px; }
-.markdown pre, .markdown code { font-family: ui-monospace, Consolas, monospace; font-size: 0.875rem; }
-.markdown pre { overflow-x: auto; padding: 8px; border: 1px solid var(--line); border-radius: 6px; }
-.markdown table { border-collapse: collapse; display: block; overflow-x: auto; }
-.markdown th, .markdown td { border: 1px solid var(--line); padding: 4px 8px; }
-.markdown blockquote { margin: 6px 0; padding-left: 10px; border-left: 3px solid var(--line); color: var(--muted); }
+
+/* 2026-10-20: 서식 읽기 화면·편집기 (docs/plans/2026-10-20-rich-text.md) */
+.rich, .rt-content { overflow-wrap: anywhere; line-height: 1.55; }
+.rich h1, .rich h2, .rich h3, .rt-content h1, .rt-content h2, .rt-content h3 { font-size: 1.05rem; margin: 10px 0 6px; }
+.rich h4, .rich h5, .rich h6, .rt-content h4, .rt-content h5, .rt-content h6 { font-size: 1rem; margin: 8px 0 4px; }
+.rich p, .rt-content p { margin: 6px 0; }
+.rich pre, .rich code, .rt-content pre, .rt-content code { font-family: ui-monospace, Consolas, monospace; font-size: 0.875rem; }
+.rich pre, .rt-content pre { overflow-x: auto; padding: 8px; border: 1px solid var(--line); border-radius: 6px; }
+.rich blockquote, .rt-content blockquote { margin: 6px 0; padding-left: 10px; border-left: 3px solid var(--line); color: var(--muted); }
+.rich ul, .rich ol, .rt-content ul, .rt-content ol { padding-left: 22px; margin: 6px 0; }
+.rich-tasks, .rt-content ul[data-type="taskList"] { list-style: none; padding-left: 4px; }
+.rich-tasks input { margin-right: 6px; }
+.rt-content ul[data-type="taskList"] li { display: flex; gap: 6px; }
+.rt-content ul[data-type="taskList"] li > div { flex: 1; }
+/* 표는 넓어도 화면을 밀지 않고 상자 안에서 가로로 움직인다 */
+.rich-table, .rt-content .tableWrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 6px 0; }
+.rich table, .rt-content table { border-collapse: collapse; min-width: 100%; }
+.rich th, .rich td, .rt-content th, .rt-content td { border: 1px solid var(--line); padding: 4px 8px; vertical-align: top; min-width: 4em; }
+.rich th, .rt-content th { background: color-mix(in srgb, var(--line) 40%, transparent); text-align: left; }
+.rt-content td p, .rt-content th p { margin: 0; }
+.rich-decisions { padding-left: 22px; }
+.rich-decisions .rich p { margin: 0; }
+.rich-footnote { margin-top: 6px; }
+
+.rt-editor { margin: 8px 0; }
+.rt-surface { border: 1px solid var(--line); border-radius: 6px; background: var(--panel); cursor: text; }
+.rt-surface:focus-within { border-color: var(--accent); }
+.rt-content { min-height: 6rem; padding: 6px 10px; outline: none; }
+.rt-editor[aria-disabled="true"] .rt-surface { opacity: 0.7; }
+.rt-preserved { margin: 6px 0; padding: 6px 8px; border: 1px dashed var(--line); border-radius: 6px; color: var(--muted); white-space: pre-wrap; user-select: none; }
+.rt-preserved-inline { padding: 0 3px; border: 1px dashed var(--line); border-radius: 4px; color: var(--muted); }
+
+/* 도구 모음: 편집 영역 위에 붙어 있고, 긴 내용을 스크롤해도 화면 위에 남는다 */
+.rt-toolbar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 6px; padding: 4px 0; background: var(--bg); }
+.rt-tool { min-width: 36px; height: 36px; padding: 0 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 1rem; }
+.rt-tool[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.rt-bold { font-weight: 800; font-family: Georgia, "Times New Roman", serif; }
+.rt-underline { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; font-weight: 600; }
+.rt-color-wrap { position: relative; display: inline-flex; }
+.rt-swatch { display: inline-block; width: 18px; height: 18px; border-radius: 4px; border: 1px solid var(--line); background: var(--fg); }
+/* 기본색: 테마 글자색 */
+.rt-swatch.rt-default { background: var(--fg); }
+/* 여러 색이 섞인 선택: 대각선 반반 무늬 */
+.rt-swatch.rt-mixed { background: linear-gradient(135deg, #c92a2a 0 33%, #1864ab 33% 66%, #2b7a3b 66% 100%); }
+.rt-mixed-label { font-size: 0.75rem; }
+.rt-palette { position: absolute; top: calc(100% + 4px); left: 0; z-index: 5; display: grid; grid-template-columns: repeat(5, auto); gap: 6px;
+  padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); box-shadow: 0 4px 16px rgb(0 0 0 / 0.15); }
+.rt-chip { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 36px; height: 36px; padding: 0 6px; font-size: 0.8125rem; }
+.rt-chip:first-child { grid-column: 1 / -1; justify-content: flex-start; }
+.rt-chip[aria-checked="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+
+.meeting-body { margin-top: 8px; }
+.conflict { margin: 8px 0; padding: 12px; border: 1px solid var(--err); border-radius: 8px; }
+.conflict-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 8px 0; }
+.conflict-cols h5 { margin: 0 0 6px; }
+.conflict-body { max-height: 40vh; overflow: auto; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; }
+@media (max-width: 640px) {
+  .conflict-cols { grid-template-columns: 1fr; }
+}
 
 .summary-list { list-style: none; margin: 12px 0; padding: 0; }
 .summary-list li + li { margin-top: 8px; }
