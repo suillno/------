@@ -26,19 +26,21 @@
 | `packages/ui/src/features/mobile/` | 휴대폰 화면: 등록 내역(분석 상태 배지), 회의 등록, 내역 상세(분석 요청·재시도), 일정 확인 | ✅ |
 | `packages/ui/src/features/notes/` | 요약·결정사항 탭: AI 요약 목록(자동 반영)과 상세(AI 원본·편집본 구분) | ✅ |
 | `packages/ui/src/features/tasks` | 독립 화면 | 🧩 |
-| `packages/ui/src/markdown.tsx` | Markdown 보기·편집/미리보기 (HTML·이미지 차단, 링크는 텍스트) | ✅ |
+| `packages/ui/src/rich/` | 서식 편집기(Tiptap)·읽기 화면(RichView·PlainText)·저장 형식 변환·팔레트 표시·충돌 비교 | ✅ |
+| `packages/ui/src/unsaved.ts` | 저장 안 한 편집 보호(탭·화면 이동·뒤로가기·창 닫기 확인) | ✅ |
 | `apps/mobile/src-tauri/gen/android/app/src/main/java/…/MainActivity.kt` | 공유 수신(텍스트·Markdown)을 보관하고 WebView 브리지 `MeetingAssistantShare.take()`로 넘김. 매니페스트에 SEND intent-filter | ✅ |
 | `packages/contracts/src/` | 오류 코드, 상태 전이, 분석 결과 schema v1·v2(목적지), RPC 응답 타입·실패 사유 문구 | ✅ |
 | `packages/client-core/src/` | Supabase API 구현, 버튼 규칙·중복 클릭 방지(`SingleFlight`), PC 분석 실행 순서, 시간대 변환, 실패 분류·백오프 | ✅ |
 | `supabase/config.toml` | 로컬 Supabase 설정 (OAuth 콜백만 JWT 검사 해제) | ✅ |
 | `supabase/migrations/` | PostgreSQL DDL·RLS·RPC. 내부 테이블·함수는 API에 노출되지 않는 `app_private` 스키마 | ✅ 동기화 기반, 분석·편집본·후보·승인·등록·OAuth |
-| `supabase/functions/<이름>/index.ts` | Edge Function 진입점 (환경변수만 읽고 `_shared`로 넘김) | ✅ 6개 (`open-meeting`은 원본 회의록 링크 중계, JWT 검사 없음) |
-| `supabase/functions/_shared/` | OAuth·캘린더 등록 처리, Google 호출, 토큰 암호화. Web 표준 API만 사용 | ✅ 테스트 33건 |
+| `supabase/functions/<이름>/index.ts` | Edge Function 진입점 (환경변수만 읽고 `_shared`로 넘김) | ✅ 8개 (`open-meeting`은 원본 회의록 링크 중계·JWT 검사 없음, `meeting-save`·`notes-save`는 서식 판정 저장) |
+| `supabase/functions/_shared/` | OAuth·캘린더 등록 처리, Google 호출, 토큰 암호화. Web 표준 API만 사용. `richtext.ts`는 서버·PC 공통 서식 규칙(AI 입력 텍스트·보이는 글자 수·분석 기준·팔레트, PC는 `client-core/src/richtext.ts`로 재사용), `richHandlers.ts`는 meeting-save·notes-save | ✅ 테스트 73건 |
+| `supabase/functions/<이름>/deno.json` | Markdown 라이브러리를 쓰는 함수(meeting-save·notes-save)의 버전 고정. `package.json`과 같아야 한다(테스트로 검사) | ✅ |
 | `supabase/functions/.env` | 로컬 Edge Function 비밀 (Git 제외) | 로컬 전용 |
-| `supabase/tests/` | RLS·트랜잭션 통합 테스트 (pgTAP). `sync_commit_order`는 dblink를 쓰는 로컬 전용 | ✅ 169건 |
+| `supabase/tests/` | RLS·트랜잭션 통합 테스트 (pgTAP). `sync_commit_order`는 dblink를 쓰는 로컬 전용 | ✅ 199건 |
 | `storage/sqlite/migrations/` | PC 캐시 전용 마이그레이션 | ⬜ |
 | `prompts/meeting-analysis/v2/` | 분석 지시문 v2(요청사항·목적지). Rust가 컴파일 시 포함. v1은 이력 보관 | ✅ |
-| `tests/integration/` | 로컬 Supabase + Edge Function 통합 테스트 (`npm run test:integration`) | ✅ 3건 |
+| `tests/integration/` | 로컬 Supabase + Edge Function 통합 테스트 (`npm run test:integration`) | ✅ 6건 |
 | `tests/e2e`, `tests/fixtures` | E2E·고정 자료 | ⬜ |
 | `scripts/` | 계약 생성(`gen-contracts.ts`), 통합 테스트 실행기, 실행기(`start-local.ps1`, 로컬/클라우드 모드 자동 판별), 설치본 갱신(`install-desktop.ps1`), 설치본 실행(`start-app.mjs`), APK 빌드(`build-android.mjs`). `.ps1`은 UTF-8 BOM 유지 | ✅ |
 | `start-meeting-assistant.cmd` | 개발용 실행 진입점 (더블클릭). 일상 실행은 설치본 바로가기 | ✅ |
