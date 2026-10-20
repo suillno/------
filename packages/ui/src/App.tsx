@@ -94,6 +94,13 @@ function MainShell({ api, platform, session }: { api: MeetingApi; platform: Plat
     setActive("meetings");
   }, []);
   const clearFocus = useCallback(() => setFocusMeetingId(null), []);
+  // 회의록 상세의 ‘요약 보기’ → 요약·결정사항 탭의 그 회의
+  const [focusSummaryId, setFocusSummaryId] = useState<string | null>(null);
+  const openSummary = useCallback((id: string) => {
+    setFocusSummaryId(id);
+    setActive("notes");
+  }, []);
+  const clearSummaryFocus = useCallback(() => setFocusSummaryId(null), []);
 
   // 로그인 전에 받은 링크는 기기에 보관돼 있다가 여기서 열린다
   useEffect(() => {
@@ -174,8 +181,8 @@ function MainShell({ api, platform, session }: { api: MeetingApi; platform: Plat
         <button type="button" onClick={() => void api.signOut()}>로그아웃</button>
       </nav>
       <main className="shell-main">
-        {active === "meetings" && <MeetingsPage focusMeetingId={focusMeetingId} onFocusHandled={clearFocus} />}
-        {active === "notes" && <NotesPage onOpenMeeting={openMeeting} />}
+        {active === "meetings" && <MeetingsPage focusMeetingId={focusMeetingId} onFocusHandled={clearFocus} onOpenSummary={openSummary} />}
+        {active === "notes" && <NotesPage onOpenMeeting={openMeeting} focusMeetingId={focusSummaryId} onFocusHandled={clearSummaryFocus} />}
         {active === "tasks" && <TasksPage />}
         {active === "calendar" && <CalendarPage />}
         {active === "settings" && <SettingsPage oauthResult={oauthResult} />}

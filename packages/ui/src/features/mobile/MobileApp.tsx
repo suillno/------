@@ -21,7 +21,7 @@ import { confirmLeave, hasUnsavedChanges, useBackGuard } from "../../unsaved";
 import { SHARE_EVENT, draftFromShare, type DeviceSettings, type Platform } from "../../platform";
 import { LoginForm } from "../auth/LoginForm";
 import { CandidateList } from "../calendar/CandidateList";
-import { MissingMeeting, NewMeetingForm, type MeetingDraft } from "../meetings";
+import { MissingMeeting, NewMeetingForm, OpenSummaryButton, type MeetingDraft } from "../meetings";
 import { MeetingBody } from "../meetings/MeetingBody";
 import { DeleteMeetingButton } from "../meetings/DeleteMeeting";
 import { InstructionsField, initialInstructions, instructionsIgnored } from "../meetings/Instructions";
@@ -34,7 +34,7 @@ type Screen =
   | { name: "new" }
   | { name: "meeting"; id: string }
   | { name: "schedule" }
-  | { name: "summaries" };
+  | { name: "summaries"; focus?: string };
 
 // ───────── 공유받은 텍스트 → 작성 중 초안 (docs/plans/2026-10-19-meeting-features.md 5장) ─────────
 // 앱 종료·로그인 전에 공유받아도 이 기기에 보관해 두었다가 로그인 후 새 회의 작성 화면에 채운다.
@@ -234,14 +234,17 @@ function MobileShell({ api, platform, session }: { api: MeetingApi; platform: Pl
             />
           )}
           {screen.name === "meeting" && meeting && (
-            <MeetingScreen key={meeting.id} meeting={meeting} onChanged={reload} onDeleted={() => { go({ name: "list" }); void reload(); }} />
+            <MeetingScreen key={meeting.id} meeting={meeting} onChanged={reload} onDeleted={() => { go({ name: "list" }); void reload(); }}
+              onOpenSummary={(id) => go({ name: "summaries", focus: id })} />
           )}
           {screen.name === "meeting" && !meeting && meetings && <MissingMeeting />}
           {screen.name === "meeting" && !meetings && <p className="muted">불러오는 중…</p>}
           {screen.name === "schedule" && (
             <ScheduleScreen meetings={meetings} pending={pending} onOpen={(id) => open({ name: "meeting", id })} onRefresh={reload} />
           )}
-          {screen.name === "summaries" && <SummariesView onOpenMeeting={(id) => open({ name: "meeting", id })} />}
+          {screen.name === "summaries" && (
+            <SummariesView key={screen.focus ?? "all"} focusMeetingId={screen.focus} onOpenMeeting={(id) => open({ name: "meeting", id })} />
+          )}
         </main>
 
         <nav className="m-tabs" aria-label="메뉴">
@@ -301,7 +304,12 @@ function MeetingListScreen(props: {
 
 const MOBILE_LABELS: Record<string, string> = { run: "분석 요청", rerun: "재분석 요청", retry: "재시도" };
 
-function MeetingScreen({ meeting, onChanged, onDeleted }: { meeting: MeetingRow; onChanged: () => Promise<void>; onDeleted: () => void }) {
+function MeetingScreen({ meeting, onChanged, onDeleted, onOpenSummary }: {
+  meeting: MeetingRow;
+  onChanged: () => Promise<void>;
+  onDeleted: () => void;
+  onOpenSummary: (meetingId: string) => void;
+}) {
   const { api } = useApp();
   const { state, error, refresh } = useMeetingAnalysis(api, meeting.id);
   return (
@@ -310,6 +318,9 @@ function MeetingScreen({ meeting, onChanged, onDeleted }: { meeting: MeetingRow;
         <div className="row between">
           <h3>{meeting.title}</h3>
           <DeleteMeetingButton meeting={meeting} onDeleted={onDeleted} />
+        </div>
+        <div className="row">
+          <OpenSummaryButton meetingId={meeting.id} hasSummary={Boolean(state?.latest_result || state?.notes)} onOpen={onOpenSummary} />
         </div>
         <p className="muted">{formatInZone(meeting.meeting_at, meeting.time_zone)} ({meeting.time_zone})</p>
         <MeetingBody meeting={meeting} onSaved={async () => { await onChanged(); await refresh(); }} />

@@ -1,27 +1,34 @@
 // ‘요약·결정사항’ 탭: 회의별 최신 AI 요약 목록 (docs/plans/2026-10-19-meeting-features.md 6장). PC·휴대폰 공통.
 // 탭을 열 때, 화면에 다시 돌아올 때, PC 분석 완료 신호를 받을 때 다시 읽는다(가져오기 버튼 없음).
-// AI 원본(읽기 전용)과 사용자 편집본을 나눠 보여 주고, 편집본은 PC·휴대폰 모두 이 화면에서 고칠 수 있다.
+// 상세에는 편집본만 보여 준다(AI 원본은 편집본의 출발점이며 따로 보이지 않는다). 편집본은 PC·휴대폰 모두 여기서 고친다.
+// 회의록 화면의 ‘요약 보기’로 들어오면 그 회의의 상세를 바로 연다(focusMeetingId).
 
 import { useCallback, useEffect, useState } from "react";
 import { formatInZone } from "@meeting/client-core";
 import type { MeetingSummaryItem } from "@meeting/contracts";
 import { Badge, ErrorText, errorMessage } from "../../common";
 import { ANALYSIS_UPDATED_EVENT, useApp, useMeetingAnalysis } from "../../context";
-import { PlainText } from "../../rich/RichView";
 import { confirmLeave } from "../../unsaved";
 import { MissingMeeting } from "../meetings";
-import { NotesEditor, PlainDecisions } from "./NotesEditor";
+import { NotesEditor } from "./NotesEditor";
 
 export const notesFeature = {
   id: "notes",
   title: "요약·결정사항",
 } as const;
 
-export function NotesPage({ onOpenMeeting }: { onOpenMeeting?: (meetingId: string) => void } = {}) {
+interface SummariesProps {
+  onOpenMeeting?: (meetingId: string) => void;
+  /** 이 회의의 상세를 바로 연다(회의록 화면의 ‘요약 보기’) */
+  focusMeetingId?: string | null;
+  onFocusHandled?: () => void;
+}
+
+export function NotesPage(props: SummariesProps = {}) {
   return (
     <section>
       <h2>요약·결정사항</h2>
-      <SummariesView onOpenMeeting={onOpenMeeting} />
+      <SummariesView {...props} />
     </section>
   );
 }
@@ -31,10 +38,16 @@ function formatTime(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" });
 }
 
-export function SummariesView({ onOpenMeeting }: { onOpenMeeting?: (meetingId: string) => void }) {
+export function SummariesView({ onOpenMeeting, focusMeetingId, onFocusHandled }: SummariesProps) {
   const { api } = useApp();
   const [items, setItems] = useState<MeetingSummaryItem[] | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(focusMeetingId ?? null);
+
+  useEffect(() => {
+    if (!focusMeetingId) return;
+    setSelected(focusMeetingId);
+    onFocusHandled?.();
+  }, [focusMeetingId, onFocusHandled]);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -96,8 +109,6 @@ function SummaryDetail({ item, onBack, onOpenMeeting }: {
 }) {
   const { api } = useApp();
   const { state, error, missing, refresh } = useMeetingAnalysis(api, item.meeting_id);
-  const result = state?.latest_result ?? null;
-
   return (
     <div>
       <div className="row between">
@@ -107,21 +118,6 @@ function SummaryDetail({ item, onBack, onOpenMeeting }: {
       <h3>{item.title}</h3>
       <p className="muted">회의 {formatInZone(item.meeting_at, item.time_zone)} · 분석 {formatTime(item.analyzed_at)}</p>
       {missing ? <MissingMeeting /> : <ErrorText>{error}</ErrorText>}
-      {result && (
-        <section className="panel" aria-label="AI 요약">
-          <div className="row between">
-            <h4>AI 요약 (원본)</h4>
-            {result.stale && <Badge tone="idle">이전 원문 기준</Badge>}
-          </div>
-          {state?.job?.user_instructions && state.job.id === result.job_id && (
-            <p className="muted">요청사항: {state.job.user_instructions}</p>
-          )}
-          <PlainText text={result.payload.summary} />
-          <h4>결정사항</h4>
-          <PlainDecisions items={result.payload.decisions} />
-          <p className="muted">AI 원본은 고칠 수 없습니다. 아래 편집본을 고치세요.</p>
-        </section>
-      )}
       {state && (
         <section className="panel" aria-label="사용자 편집본">
           <NotesEditor state={state} refresh={refresh} />

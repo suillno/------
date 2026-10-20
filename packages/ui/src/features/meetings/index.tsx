@@ -18,7 +18,12 @@ export const meetingsFeature = {
 } as const;
 
 /** focusMeetingId: 캘린더 '원본 회의록 보기' 링크(딥링크)로 받은 회의. 목록에 없으면 안내한다 */
-export function MeetingsPage({ focusMeetingId, onFocusHandled }: { focusMeetingId?: string | null; onFocusHandled?: () => void } = {}) {
+export function MeetingsPage({ focusMeetingId, onFocusHandled, onOpenSummary }: {
+  focusMeetingId?: string | null;
+  onFocusHandled?: () => void;
+  /** 요약·결정사항 탭에서 이 회의를 연다 */
+  onOpenSummary?: (meetingId: string) => void;
+} = {}) {
   const { api } = useApp();
   const [meetings, setMeetings] = useState<MeetingRow[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -89,7 +94,7 @@ export function MeetingsPage({ focusMeetingId, onFocusHandled }: { focusMeetingI
           )}
           {missing && !creating && !current && <MissingMeeting />}
           {current && (
-            <MeetingDetail key={current.id} meeting={current} onChanged={load} onDeleted={async () => { setSelected(null); await load(); }} />
+            <MeetingDetail key={current.id} meeting={current} onChanged={load} onOpenSummary={onOpenSummary} onDeleted={async () => { setSelected(null); await load(); }} />
           )}
           {!creating && !current && !missing && <p className="muted">회의록을 고르거나 새로 작성하세요.</p>}
         </div>
@@ -110,6 +115,12 @@ function nowLocal(): string {
   const d = new Date();
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   return d.toISOString().slice(0, 16);
+}
+
+/** 회의록 → 요약·결정사항 탭의 이 회의. 분석 결과·편집본이 있을 때만 보인다 */
+export function OpenSummaryButton({ meetingId, hasSummary, onOpen }: { meetingId: string; hasSummary: boolean; onOpen?: (id: string) => void }) {
+  if (!onOpen || !hasSummary) return null;
+  return <button type="button" onClick={() => confirmLeave() && onOpen(meetingId)}>요약 보기</button>;
 }
 
 /** 회의 링크가 가리키는 회의가 없을 때(삭제됐거나 다른 계정의 회의) */
@@ -203,7 +214,12 @@ export function NewMeetingForm({ onCancel, onCreated, initial, onDraftChange }: 
   );
 }
 
-function MeetingDetail({ meeting, onChanged, onDeleted }: { meeting: MeetingRow; onChanged: () => Promise<void>; onDeleted: () => Promise<void> }) {
+function MeetingDetail({ meeting, onChanged, onDeleted, onOpenSummary }: {
+  meeting: MeetingRow;
+  onChanged: () => Promise<void>;
+  onDeleted: () => Promise<void>;
+  onOpenSummary?: (meetingId: string) => void;
+}) {
   const { api } = useApp();
   const { state, error, refresh } = useMeetingAnalysis(api, meeting.id);
   return (
@@ -211,7 +227,10 @@ function MeetingDetail({ meeting, onChanged, onDeleted }: { meeting: MeetingRow;
       <article className="panel">
         <div className="row between">
           <h3>{meeting.title}</h3>
-          <DeleteMeetingButton meeting={meeting} onDeleted={onDeleted} />
+          <div className="row">
+            <OpenSummaryButton meetingId={meeting.id} hasSummary={Boolean(state?.latest_result || state?.notes)} onOpen={onOpenSummary} />
+            <DeleteMeetingButton meeting={meeting} onDeleted={onDeleted} />
+          </div>
         </div>
         <p className="muted">{formatInZone(meeting.meeting_at, meeting.time_zone)} ({meeting.time_zone})</p>
         <MeetingBody meeting={meeting} onSaved={async () => { await onChanged(); await refresh(); }} />
