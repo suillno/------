@@ -1,0 +1,8 @@
+{
+  "imports": {
+    "mdast-util-from-markdown": "npm:mdast-util-from-markdown@2.1.0",
+    "mdast-util-gfm": "npm:mdast-util-gfm@3.1.0",
+    "micromark-extension-gfm": "npm:micromark-extension-gfm@3.0.0",
+    "mdast": "npm:@types/mdast@4.0.4"
+  }
+}

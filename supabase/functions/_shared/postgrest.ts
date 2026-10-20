@@ -41,6 +41,21 @@ export async function rpc<T>(ep: SupabaseEndpoint, fn: string, args: Record<stri
   return body as T;
 }
 
+/**
+ * 테이블 읽기(GET /rest/v1/<table>?<query>). 사용자 JWT로 부르면 RLS가 소유권을 검사한다.
+ * query는 호출하는 코드가 만든 고정 형식만 넘긴다(사용자 입력은 UUID 검사 후 eq 값으로만).
+ */
+export async function select<T>(ep: SupabaseEndpoint, table: string, query: string): Promise<T[]> {
+  if (!/^[a-z_]+$/.test(table)) throw new Error("잘못된 테이블 이름입니다");
+  const res = await ep.fetch(`${ep.url}/rest/v1/${table}?${query}`, {
+    headers: { apikey: ep.apiKey, Authorization: `Bearer ${ep.bearer}`, Accept: "application/json" },
+  });
+  const text = await res.text();
+  const body: unknown = text ? JSON.parse(text) : null;
+  if (!res.ok) throw new RpcError(res.status, body);
+  return (Array.isArray(body) ? body : []) as T[];
+}
+
 /** 사용자 JWT를 Auth 서버에 확인해 user id를 얻는다. 서명 검증을 직접 하지 않는다. */
 export async function getUserId(ep: SupabaseEndpoint): Promise<string | null> {
   const res = await ep.fetch(`${ep.url}/auth/v1/user`, {

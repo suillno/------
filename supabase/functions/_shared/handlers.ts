@@ -73,7 +73,7 @@ export function loadServerEnv(get: (name: string) => string | undefined, fetchIm
   };
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 function corsHeaders(req: Request, env: ServerEnv): Record<string, string> {
   const origin = req.headers.get("Origin");
@@ -86,14 +86,14 @@ function corsHeaders(req: Request, env: ServerEnv): Record<string, string> {
   };
 }
 
-function json(req: Request, env: ServerEnv, status: number, body: unknown): Response {
+export function json(req: Request, env: ServerEnv, status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { "Content-Type": "application/json", ...corsHeaders(req, env) },
   });
 }
 
-function apiError(req: Request, env: ServerEnv, status: number, code: string, message: string): Response {
+export function apiError(req: Request, env: ServerEnv, status: number, code: string, message: string): Response {
   return json(req, env, status, { code, message, details: null, hint: null });
 }
 
@@ -102,11 +102,11 @@ function bearer(req: Request): string | null {
   return h && h.startsWith("Bearer ") ? h.slice(7) : null;
 }
 
-function userEndpoint(env: ServerEnv, token: string): SupabaseEndpoint {
+export function userEndpoint(env: ServerEnv, token: string): SupabaseEndpoint {
   return { url: env.supabaseUrl, apiKey: env.anonKey, bearer: token, fetch: env.fetch };
 }
 
-function serviceEndpoint(env: ServerEnv): SupabaseEndpoint {
+export function serviceEndpoint(env: ServerEnv): SupabaseEndpoint {
   return { url: env.supabaseUrl, apiKey: env.serviceRoleKey, bearer: env.serviceRoleKey, fetch: env.fetch };
 }
 
@@ -115,7 +115,7 @@ function googleConfig(env: ServerEnv): GoogleConfig | null {
 }
 
 /** POST + 사용자 인증 공통 처리. 실패하면 Response, 성공하면 사용자 정보와 본문 */
-async function authenticatedPost(
+export async function authenticatedPost(
   req: Request, env: ServerEnv,
 ): Promise<Response | { token: string; userId: string; body: Record<string, unknown> }> {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(req, env) });
@@ -136,7 +136,7 @@ async function authenticatedPost(
   return { token, userId, body: body as Record<string, unknown> };
 }
 
-function rpcFailure(req: Request, env: ServerEnv, e: unknown): Response {
+export function rpcFailure(req: Request, env: ServerEnv, e: unknown): Response {
   if (e instanceof RpcError) return json(req, env, e.status, e.body);
   return apiError(req, env, 503, "SERVICE_UNAVAILABLE", "서버 처리 중 오류가 발생했습니다.");
 }
