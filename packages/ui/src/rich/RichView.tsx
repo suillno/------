@@ -1,7 +1,7 @@
 // 서식이 적용된 읽기 화면. 저장 형식(Markdown + 허용 태그)을 서버와 같은 해석 규칙으로 읽어 React 요소로만 그린다.
 // - HTML 문자열을 DOM에 넣지 않는다. 허용 밖 HTML은 글자만 남는다.
 // - 링크는 이동하지 않는 글자 + 주소, 이미지는 대체 문구, 표는 가로 스크롤 상자.
-// - AI 출력(일반 텍스트)은 PlainText로 보여 준다(기호를 서식으로 해석하지 않음).
+// - AI 출력도 Markdown으로 쓰이므로 같은 규칙으로 보여 준다(허용 태그 외 HTML은 글자만, 실행 없음).
 
 import { Fragment, useEffect, type ReactNode } from "react";
 import { foldInline, isPaletteColor, parseMarkdown, stripTags, type InlineNode } from "@meeting/client-core";

@@ -1,5 +1,5 @@
 // 요약·결정사항 편집본 (PC·휴대폰 공통). docs/plans/2026-10-20-rich-text.md 6·7장.
-// - AI 원본은 읽기 전용(PlainText). 편집본만 서식 편집기로 고친다.
+// - AI 결과는 읽기 전용(서식으로 표시, AI가 Markdown으로 쓴다). 편집본만 서식 편집기로 고친다.
 // - 편집 중에는 자동 갱신·재분석 결과가 편집 내용을 바꾸지 않는다. 새 결과 적용은 사용자가 고를 때만, 버전 검사와 함께.
 // - 보이는 글자 4000자(요약)·1000자(결정 항목), 서식 포함 저장 한도를 화면에서 먼저 알리고 자르지 않는다. 서버도 같은 규칙으로 검사한다.
 
@@ -10,7 +10,7 @@ import { Badge, ErrorText, errorMessage } from "../../common";
 import { useApp } from "../../context";
 import { ConflictCompare } from "../../rich/Conflict";
 import { DecisionsEditor, RichEditor, type DecisionsEditorHandle, type RichEditorHandle } from "../../rich/RichEditor";
-import { PlainText, RichView } from "../../rich/RichView";
+import { RichView } from "../../rich/RichView";
 import { useUnsavedChanges } from "../../unsaved";
 
 export function DecisionsView({ items, empty = "결정사항이 없습니다." }: { items: readonly string[]; empty?: string }) {
@@ -18,11 +18,6 @@ export function DecisionsView({ items, empty = "결정사항이 없습니다." }
   return <ul className="rich-decisions">{items.map((d, i) => <li key={i}><RichView source={d} /></li>)}</ul>;
 }
 
-/** AI 출력 결정사항(일반 텍스트) */
-export function PlainDecisions({ items }: { items: readonly string[] }) {
-  if (items.length === 0) return <p className="muted">결정사항이 없습니다.</p>;
-  return <ul>{items.map((d, i) => <li key={i} className="ai-text">{d}</li>)}</ul>;
-}
 
 export function NotesEditor({ state, refresh }: { state: MeetingAnalysisState; refresh: () => Promise<void> }) {
   const { api } = useApp();
@@ -194,8 +189,8 @@ export function NotesEditor({ state, refresh }: { state: MeetingAnalysisState; r
         <div className="new-result">
           <strong>새 AI 결과가 있습니다</strong>
           <p className="muted">편집본은 자동으로 바뀌지 않습니다. 적용할 항목을 골라 ‘새 결과 적용’을 누르세요.</p>
-          <PlainText text={latest.payload.summary} />
-          <PlainDecisions items={latest.payload.decisions} />
+          <RichView source={latest.payload.summary} empty="(요약 없음)" />
+          <DecisionsView items={latest.payload.decisions} />
           <div className="row">
             <label className="inline">
               <input type="checkbox" checked={fields.summary} onChange={(e) => setFields({ ...fields, summary: e.target.checked })} /> 요약

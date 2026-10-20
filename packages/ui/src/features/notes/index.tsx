@@ -4,7 +4,7 @@
 // 회의록 화면의 ‘요약 보기’로 들어오면 그 회의의 상세를 바로 연다(focusMeetingId).
 
 import { useCallback, useEffect, useState } from "react";
-import { formatInZone } from "@meeting/client-core";
+import { formatInZone, visibleText } from "@meeting/client-core";
 import type { MeetingSummaryItem } from "@meeting/contracts";
 import { Badge, ErrorText, errorMessage } from "../../common";
 import { ANALYSIS_UPDATED_EVENT, useApp, useMeetingAnalysis } from "../../context";
@@ -31,6 +31,12 @@ export function NotesPage(props: SummariesProps = {}) {
       <SummariesView {...props} />
     </section>
   );
+}
+
+/** 목록 미리보기: 서식 기호 없이 보이는 글자만(편집본 우선) */
+export function summaryPreview(i: Pick<MeetingSummaryItem, "summary" | "summary_preview">): string {
+  const text = visibleText(i.summary ?? i.summary_preview).replace(/\s+/g, " ").trim();
+  return text.length > 160 ? `${text.slice(0, 160)}…` : text;
 }
 
 function formatTime(iso: string): string {
@@ -93,7 +99,7 @@ export function SummariesView({ onOpenMeeting, focusMeetingId, onFocusHandled }:
                 {i.stale && <Badge tone="idle">이전 원문 기준</Badge>}
               </span>
               <span className="muted">회의 {formatInZone(i.meeting_at, i.time_zone)} · 분석 {formatTime(i.analyzed_at)}</span>
-              <span className="summary-preview">{i.summary_preview || "(요약 없음)"}</span>
+              <span className="summary-preview">{summaryPreview(i) || "(요약 없음)"}</span>
             </button>
           </li>
         ))}

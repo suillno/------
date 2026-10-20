@@ -155,5 +155,11 @@ select throws_like(
     'cccccccc-0000-4000-8000-0000000000e1', :nv + 1, json_build_object('summary', repeat('가', 4001))),
   '%"VALIDATION_FAILED"%', 'L 사용자 경로는 지금 한도(4000자)를 유지한다');
 
+-- ───────── 요약 목록: 편집본 우선 (20261020100000) ─────────
+select is((select s ->> 'summary' from jsonb_array_elements(public.meeting_summaries()) s), repeat('가', 12000),
+  'S 요약 목록은 편집본 요약 전체를 돌려준다(AI 원본보다 우선)');
+select is((select (s ->> 'has_user_notes')::boolean from jsonb_array_elements(public.meeting_summaries()) s), true,
+  'S 편집본 있음 표시');
+
 select * from finish();
 rollback;

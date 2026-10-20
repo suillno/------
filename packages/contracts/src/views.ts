@@ -79,6 +79,8 @@ export interface MeetingSummaryItem {
   time_zone: string;
   result_id: string;
   summary_preview: string;
+  /** 편집본 요약(없으면 최신 AI 요약) 전체. 화면이 서식을 뺀 글자로 미리보기를 만든다. 이전 서버에는 없다 */
+  summary?: string;
   analyzed_at: string;
   /** 분석 뒤 회의록이 바뀌어 이전 원문 기준인 결과 */
   stale: boolean;
