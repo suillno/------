@@ -35,6 +35,8 @@ export interface Session {
   email: string | null;
 }
 
+export type MeetingPatch = Partial<{ title: string; body: string; meeting_at: string; time_zone: string }>;
+
 export interface NewMeeting {
   title: string;
   body: string;
@@ -97,6 +99,11 @@ export interface MeetingApi {
   createMeeting(operationId: string, input: NewMeeting): Promise<MeetingRow>;
   /** 회의록 영구 삭제(분석·후보 포함). Google에 등록된 일정은 남는다 */
   purgeMeeting(operationId: string, meetingId: string, baseVersion: number): Promise<{ id: string; purged: true; registered_events_kept: number }>;
+  /**
+   * 회의 제목·본문·일시 수정(Edge Function meeting-save). 서버가 AI에 전달되는 텍스트가 바뀌었는지 판정해
+   * 서식만 바뀌었으면 기존 분석 결과·일정 후보를 유지한다(analysis_changed=false).
+   */
+  patchMeeting(operationId: string, meetingId: string, baseVersion: number, patch: MeetingPatch): Promise<MeetingRow & { analysis_changed: boolean }>;
   /** ‘요약·결정사항’ 탭: 회의별 최신 분석 결과 목록 */
   listSummaries(): Promise<MeetingSummaryItem[]>;
 
@@ -109,6 +116,7 @@ export interface MeetingApi {
   requestAnalysis(operationId: string, meetingId: string, sourceRevisionId: string, mode: "initial" | "rerun", userInstructions?: string | null): Promise<AnalysisJob>;
   /** 분석 '재시도' 버튼 */
   retryAnalysis(operationId: string, jobId: string): Promise<AnalysisJob>;
+  /** 요약·결정사항 편집본 저장(Edge Function notes-save). 보이는 글자 수·서식 포함 저장 한도를 서버가 다시 검사한다 */
   patchNotes(operationId: string, meetingId: string, baseVersion: number, patch: { summary?: string; decisions?: string[] }): Promise<MeetingNotes>;
   applyResult(operationId: string, meetingId: string, baseVersion: number, resultId: string, fields: ("summary" | "decisions")[]): Promise<MeetingNotes>;
 
@@ -271,8 +279,11 @@ export function createSupabaseMeetingApi(opts: SupabaseApiOptions): MeetingApi {
     retryAnalysis(operationId, jobId) {
       return call("analysis_retry", { p_operation_id: operationId, p_job_id: jobId });
     },
+    patchMeeting(operationId, meetingId, baseVersion, patch) {
+      return invoke("meeting-save", { operation_id: operationId, id: meetingId, base_version: baseVersion, patch });
+    },
     patchNotes(operationId, meetingId, baseVersion, patch) {
-      return call("meeting_notes_patch", { p_operation_id: operationId, p_meeting_id: meetingId, p_base_version: baseVersion, p_patch: patch });
+      return invoke("notes-save", { operation_id: operationId, meeting_id: meetingId, base_version: baseVersion, patch });
     },
     applyResult(operationId, meetingId, baseVersion, resultId, fields) {
       return call("meeting_notes_apply_result", {

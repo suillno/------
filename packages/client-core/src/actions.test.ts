@@ -7,7 +7,7 @@ const REV = "11111111-0000-4000-8000-000000000001";
 
 function state(job: Partial<AnalysisJob> | null, revision = REV): MeetingAnalysisState {
   return {
-    meeting: { id: "m", version: 1, revision_id: revision, deleted: false },
+    meeting: { id: "m", version: 1, revision_id: revision, analysis_revision_id: revision, deleted: false },
     job: job && ({
       id: "j", meeting_id: "m", source_revision_id: REV, run_no: 1, status: "queued", version: 1, device_id: null,
       lease_until: null, attempt: 0, error_code: null, requested_at: "", started_at: null, finished_at: null, ...job,
@@ -35,6 +35,13 @@ describe("analysisView", () => {
     const v = analysisView(state({ status: "completed" }, "22222222-0000-4000-8000-000000000002"), false);
     expect(v.statusLabel).toBe("완료 (이전 원문 기준)");
     expect(kinds(v)).toEqual(["run:true"]);
+  });
+  it("C01 서식만 바뀌어 revision만 새로 생기면(분석 기준 그대로) 원문 변경이 아니다", () => {
+    const s = state({ status: "completed" });
+    s.meeting = { ...s.meeting, revision_id: "33333333-0000-4000-8000-000000000003" };
+    const v = analysisView(s, false);
+    expect(v.statusLabel).toBe("완료");
+    expect(kinds(v)).toEqual(["rerun:true"]);
   });
   it("실패하면 사유와 '재시도'를 보여준다", () => {
     const v = analysisView(state({ status: "failed", error_code: "RATE_LIMITED" }), false);

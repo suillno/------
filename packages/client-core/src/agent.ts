@@ -4,6 +4,7 @@
 
 import type { AnalysisResult } from "@meeting/contracts";
 import { ApiRequestError, type AnalysisMetadata, type ClaimedAnalysis, type MeetingApi } from "./api";
+import { analysisText } from "./richtext";
 
 /** CLI 실행 결과. 데스크톱이 업로드 전에 로컬 파일로 먼저 저장한 값이다. */
 export interface SavedAnalysis {
@@ -113,7 +114,8 @@ export async function runOneAnalysis(api: MeetingApi, runner: AnalysisRunner, op
 
   let outcome: RunOutcome;
   try {
-    outcome = await runner.run(opts.userId, claimed);
+    // AI에는 서식 기호가 아닌 읽는 텍스트를 넘긴다(서버 판정과 같은 변환 코드, ADR 0005).
+    outcome = await runner.run(opts.userId, { ...claimed, input: { ...claimed.input, body: analysisText(claimed.input.body) } });
   } catch {
     outcome = { ok: false, error_code: "CLI_ERROR" };
   } finally {

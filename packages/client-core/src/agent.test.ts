@@ -65,6 +65,19 @@ describe("runOneAnalysis", () => {
     expect(onStart).not.toHaveBeenCalled();
   });
 
+  it("A01 CLI에는 서식 기호가 아닌 읽는 텍스트를 넘긴다(요청사항·다른 입력은 그대로)", async () => {
+    const f = fakes();
+    f.api.claimAnalysis.mockResolvedValueOnce({
+      ...claimed,
+      input: { ...claimed.input, body: "# 제목\n\n**굵게** <u>밑줄</u> <span style=\"color:#c92a2a\">색</span>\n\n- 항목", user_instructions: "짧게" },
+    });
+    await runOneAnalysis(f.typedApi, f.runner, { userId: "u", deviceId: "pc" });
+    const sent = vi.mocked(f.runner.run).mock.calls[0]![1];
+    expect(sent.input.body).toBe("제목\n굵게 밑줄 색\n- 항목");
+    expect(sent.input.user_instructions).toBe("짧게");
+    expect(sent.input.source_revision_id).toBe("rev");
+  });
+
   it("실행 → 업로드 → 로컬 저장본 정리", async () => {
     const f = fakes();
     expect(await runOneAnalysis(f.typedApi, f.runner, { userId: "u", deviceId: "pc", jobId: "job-1" })).toBe("completed");

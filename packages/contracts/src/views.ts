@@ -13,6 +13,8 @@ export interface MeetingRow {
   time_zone: string;
   version: number;
   revision_id: string;
+  /** 분석 기준 revision. 서식만 바꾸면 그대로다(ADR 0005). 원문 변경 판정은 이 값과 비교한다 */
+  analysis_revision_id: string;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -123,7 +125,7 @@ export interface LatestResult {
 }
 
 export interface MeetingAnalysisState {
-  meeting: { id: string; version: number; revision_id: string; deleted: boolean };
+  meeting: { id: string; version: number; revision_id: string; analysis_revision_id: string; deleted: boolean };
   job: AnalysisJob | null;
   latest_result: LatestResult | null;
   notes: MeetingNotes | null;

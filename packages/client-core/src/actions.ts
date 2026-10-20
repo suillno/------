@@ -36,7 +36,8 @@ export function analysisView(state: MeetingAnalysisState, pending: boolean): Ana
     return { statusLabel: "분석 전", tone: "idle", message: null, buttons: [disable({ kind: "run", label: "분석 실행", enabled: true })] };
   }
 
-  const current = job.source_revision_id === meeting.revision_id;
+  // 서식만 바뀐 경우는 원문 변경이 아니다(분석 기준 revision과 비교)
+  const current = job.source_revision_id === (meeting.analysis_revision_id ?? meeting.revision_id);
   const inProgress = { kind: "run" as const, label: "분석 실행", enabled: false, reason: "분석이 진행 중입니다" };
   switch (job.status) {
     case "queued":
